@@ -1,8 +1,8 @@
 """init
 
-Revision ID: 658e9c9b7449
+Revision ID: 577265257e64
 Revises: 
-Create Date: 2026-01-04 19:13:49.062112
+Create Date: 2026-01-04 19:27:16.196007
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '658e9c9b7449'
+revision: str = '577265257e64'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -32,7 +32,7 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('user',
-    sa.Column('id', sa.UUID(), nullable=False),
+    sa.Column('id', sa.String(length=36), nullable=False),
     sa.Column('name', sa.String(length=30), nullable=False),
     sa.Column('email', sa.String(length=30), nullable=True),
     sa.Column('hashed_password', sa.String(length=64), nullable=True),
@@ -50,7 +50,7 @@ def upgrade() -> None:
     )
     op.create_table('user_clublist',
     sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
-    sa.Column('user_id', sa.UUID(), nullable=False),
+    sa.Column('user_id', sa.String(length=36), nullable=False),
     sa.Column('club_id', sa.Integer(), nullable=False),
     sa.Column('permission', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['club_id'], ['club.id'], ),
@@ -59,11 +59,10 @@ def upgrade() -> None:
     )
     op.create_table('favorite',
     sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
-    sa.Column('user_id', sa.UUID(), nullable=False),
+    sa.Column('user_id', sa.String(length=36), nullable=False),
     sa.Column('asset_id', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['asset_id'], ['assets.id'], ),
-    sa.ForeignKeyConstraint(['user_id'], ['user.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id', 'user_id')
     )
     op.create_table('picture',
     sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
@@ -79,10 +78,9 @@ def upgrade() -> None:
     sa.Column('start_date', sa.DateTime(), nullable=False),
     sa.Column('end_date', sa.DateTime(), nullable=False),
     sa.Column('asset_id', sa.Integer(), nullable=False),
-    sa.Column('user_id', sa.UUID(), nullable=False),
+    sa.Column('user_id', sa.String(length=36), nullable=False),
     sa.ForeignKeyConstraint(['asset_id'], ['assets.id'], ),
-    sa.ForeignKeyConstraint(['user_id'], ['user.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id', 'user_id')
     )
     # ### end Alembic commands ###
 
