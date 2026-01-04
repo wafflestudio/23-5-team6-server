@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
-from sqlalchemy import Integer, DateTime, ForeignKey
+from sqlalchemy import Integer, DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 from asset_management.database.common import Base
@@ -18,7 +18,7 @@ class Picture(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     date: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     assets_id: Mapped[int] = mapped_column(ForeignKey("assets.id"), nullable=False)
-    uploaded_user: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("user.id"), nullable=False)
+    uploaded_user: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid.uuid4)
     category_id: Mapped[int] = mapped_column(ForeignKey("category.id"), nullable=False)
 
     # Relationships

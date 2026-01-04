@@ -1,8 +1,7 @@
 import uuid
 from typing import TYPE_CHECKING
-from sqlalchemy import Integer, ForeignKey
+from sqlalchemy import Integer, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.dialects.postgresql import UUID
 from asset_management.database.common import Base
 
 if TYPE_CHECKING:
@@ -14,7 +13,7 @@ class Favorite(Base):
     __tablename__ = "favorite"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("user.id"), nullable=False)
+    user_id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid.uuid4)
     asset_id: Mapped[int] = mapped_column(ForeignKey("assets.id"), nullable=False)
 
     # Relationships

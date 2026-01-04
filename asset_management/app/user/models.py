@@ -2,7 +2,6 @@ import uuid
 from typing import List, Optional, TYPE_CHECKING
 from sqlalchemy import String, Integer, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.dialects.postgresql import UUID
 from asset_management.database.common import Base
 
 if TYPE_CHECKING:
@@ -15,7 +14,7 @@ if TYPE_CHECKING:
 class User(Base):
     __tablename__ = "user"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(30), nullable=False)
     email: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
     hashed_password: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
