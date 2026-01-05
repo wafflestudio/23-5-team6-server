@@ -17,7 +17,7 @@ class Schedule(Base):
     start_date: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     end_date: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     asset_id: Mapped[int] = mapped_column(ForeignKey("assets.id"), nullable=False)
-    user_id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("user.id"), nullable=False)
 
     # Relationships
     asset: Mapped["Asset"] = relationship(back_populates="schedules")

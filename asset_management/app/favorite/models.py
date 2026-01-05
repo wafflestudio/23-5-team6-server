@@ -13,7 +13,7 @@ class Favorite(Base):
     __tablename__ = "favorite"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("user.id"), nullable=False)
     asset_id: Mapped[int] = mapped_column(ForeignKey("assets.id"), nullable=False)
 
     # Relationships

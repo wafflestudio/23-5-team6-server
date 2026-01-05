@@ -18,10 +18,10 @@ class Picture(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     date: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     assets_id: Mapped[int] = mapped_column(ForeignKey("assets.id"), nullable=False)
-    uploaded_user: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("user.id"), nullable=False)
     category_id: Mapped[int] = mapped_column(ForeignKey("category.id"), nullable=False)
 
     # Relationships
     asset: Mapped["Asset"] = relationship(back_populates="pictures")
-    uploaded_user: Mapped["User"] = relationship(back_populates="uploaded_pictures")
+    user: Mapped["User"] = relationship(back_populates="uploaded_pictures")
     category: Mapped["Category"] = relationship(back_populates="pictures")
