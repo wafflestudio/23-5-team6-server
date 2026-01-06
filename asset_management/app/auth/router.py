@@ -34,7 +34,7 @@ def refresh_token(
   return TokenResponse(**tokens)
 
 
-@router.get("/logout", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/logout", status_code=status.HTTP_204_NO_CONTENT)
 def logout(
   auth_service: Annotated[AuthServices, Depends()],
   token: Annotated[str, Depends(get_header_token)]
