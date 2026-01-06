@@ -27,39 +27,22 @@ def user_data(client, db_session):
   response = client.post("/api/users/signup", json=test_user_data)
   assert response.status_code == 201
   data = response.json()
-
+  assert data["name"] == test_user_data['name']
+  assert data["email"] == test_user_data['email']
+  data['password'] = test_user_data['password']
   return data
 
-def issue_token(user_id: int) -> str:
-  header = {"alg": "HS256"}
-  payload_acc = {
-    "sub": user_id,
-    "type": "access",
-    "exp": datetime.now()
-    + timedelta(minutes=AUTH_SETTINGS.SHORT_SESSION_LIFESPAN),
-  }
-  payload_ref = {
-    "sub": user_id,
-    "type": "refresh",
-    "exp": datetime.now()
-    + timedelta(minutes=AUTH_SETTINGS.LONG_SESSION_LIFESPAN),
-  }
-  access_token = jwt.encode(header, payload_acc, AUTH_SETTINGS.ACCESS_TOKEN_SECRET)
-  refresh_token = jwt.encode(header, payload_ref, AUTH_SETTINGS.REFRESH_TOKEN_SECRET)
-
-  return {"access_token": access_token, "refresh_token": refresh_token}
-
 @pytest.fixture(scope="function")
-def auth_token(user_data):
-  """Provide an authentication token for the test user"""
-  user_id = user_data["id"]
-  tokens = issue_token(user_id)
-  return tokens
+def auth_token(client, user_data):
+  response = client.post(
+    "/api/auth/login",
+    json={"email": user_data["email"], "password": user_data["password"]})
+  return response.json()
 
-def test_get_token(client: TestClient, auth_token, user_data):
+def test_get_token(client: TestClient, user_data):
   tokens = client.post(
     "/api/auth/login",
-    data={"email": user_data["email"], "password": user_data["password"]})
+    json={"email": user_data["email"], "password": user_data["password"]})
   assert tokens.status_code == 200
   tokens = tokens.json()
   
@@ -71,10 +54,10 @@ def test_get_token(client: TestClient, auth_token, user_data):
   assert "sub" in refresh_token
   assert access_token["sub"] == user_data["id"]
   assert access_token["type"] == "access"
-  assert access_token["exp"] < datetime.now().timestamp()
+  assert access_token["exp"] > datetime.now().timestamp()
   assert refresh_token["sub"] == user_data["id"]
   assert refresh_token["type"] == "refresh"
-  assert refresh_token["exp"] < datetime.now().timestamp()
+  assert refresh_token["exp"] > datetime.now().timestamp()
 
 def test_expired_token(client: TestClient, user_data):
   header = {"alg": "HS256"}
@@ -107,15 +90,15 @@ def test_refresh_token(client: TestClient, user_data, auth_token):
   assert "sub" in refresh_token
   assert access_token["sub"] == user_data["id"]
   assert access_token["type"] == "access"
-  assert access_token["exp"] < datetime.now().timestamp()
+  assert access_token["exp"] > datetime.now().timestamp()
   assert refresh_token["sub"] == user_data["id"]
   assert refresh_token["type"] == "refresh"
-  assert refresh_token["exp"] < datetime.now().timestamp()
+  assert refresh_token["exp"] > datetime.now().timestamp()
 
 def test_logout(client: TestClient, auth_token):
   access_token = auth_token["refresh_token"]
 
-  response = client.post(
+  response = client.get(
     "/api/auth/logout",
     headers={"Authorization": f"Bearer {access_token}"})
   assert response.status_code == 204
