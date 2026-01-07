@@ -1,8 +1,11 @@
 version: "3.8"
 services:
-  api:
-    build: .
-    container_name: api
+  asset_management:
+    image: seaotter316/asset_management:test
+    container_name: asset_management
+    env_file:
+      - /home/ubuntu/.env.prod
     ports:
       - "8000:8000"
+    command: sh -c "uv run alembic upgrade head && uv run uvicorn asset_management.main:app --host 0.0.0.0 --port 8000"
     restart: always
