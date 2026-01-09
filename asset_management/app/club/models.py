@@ -13,6 +13,8 @@ class Club(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(30), nullable=False)
+    description: Mapped[str] = mapped_column(String(255), nullable=True)
+    club_code: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
 
     # Relationships
     user_clublists: Mapped[List["UserClublist"]] = relationship(back_populates="club")

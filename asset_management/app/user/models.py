@@ -11,7 +11,13 @@ if TYPE_CHECKING:
     from asset_management.app.favorite.models import Favorite
     from asset_management.app.picture.models import Picture
 
+from enum import Enum
 
+class UserPermission(Enum):
+  USER = 0
+  ADMIN = 1
+  APPLICANT = 2
+  
 class User(Base):
     __tablename__ = "user"
 
@@ -20,6 +26,8 @@ class User(Base):
     email: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
     hashed_password: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     social_email: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
+    is_admin: Mapped[bool] = mapped_column(nullable=False, default=False)
+    student_id: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
 
     # Relationships
     user_clublists: Mapped[List["UserClublist"]] = relationship(back_populates="user")
