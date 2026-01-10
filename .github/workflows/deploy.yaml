@@ -20,6 +20,7 @@ jobs:
           docker push ${{ secrets.DOCKER_HUB_USERNAME }}/asset_management:test
   deploy: 
     runs-on: ubuntu-latest
+    needs: build
     steps:
       - name: SSH to EC2 and deploy
         uses: appleboy/ssh-action@v1.2.3
