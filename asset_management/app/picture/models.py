@@ -22,6 +22,9 @@ class Picture(Base):
     category_id: Mapped[int] = mapped_column(ForeignKey("category.id"), nullable=False)
 
     # Relationships
-    asset: Mapped["Asset"] = relationship(back_populates="pictures")
+    asset: Mapped["Asset"] = relationship(
+        back_populates="pictures",
+        foreign_keys=[assets_id]
+    )
     user: Mapped["User"] = relationship(back_populates="uploaded_pictures")
     category: Mapped["Category"] = relationship(back_populates="pictures")

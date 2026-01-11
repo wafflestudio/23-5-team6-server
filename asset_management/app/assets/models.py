@@ -1,4 +1,4 @@
-from typing import List, TYPE_CHECKING
+from typing import List, TYPE_CHECKING, Optional
 from sqlalchemy import String, Integer, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from asset_management.database.common import Base
@@ -10,7 +10,13 @@ if TYPE_CHECKING:
     from asset_management.app.favorite.models import Favorite
     from asset_management.app.picture.models import Picture
 
+from enum import Enum
 
+
+class AssetStatus(Enum):
+  AVAILABLE = 0
+  CHECKED_OUT = 1
+  
 class Asset(Base):
     __tablename__ = "assets"
 
@@ -18,10 +24,18 @@ class Asset(Base):
     name: Mapped[str] = mapped_column(String(50), nullable=False)
     club_id: Mapped[int] = mapped_column(ForeignKey("club.id"), nullable=False)
     category_id: Mapped[int] = mapped_column(ForeignKey("category.id"), nullable=False)
+    picture_id: Mapped[Optional[int]] = mapped_column(ForeignKey("picture.id"), nullable=True)
+    status: Mapped[int] = mapped_column(Integer, nullable=False, default=AssetStatus.AVAILABLE)
 
     # Relationships
     club: Mapped["Club"] = relationship(back_populates="assets")
     category: Mapped["Category"] = relationship(back_populates="assets")
     schedules: Mapped[List["Schedule"]] = relationship(back_populates="asset")
     favorites: Mapped[List["Favorite"]] = relationship(back_populates="asset")
-    pictures: Mapped[List["Picture"]] = relationship(back_populates="asset")
+    main_picture: Mapped[Optional["Picture"]] = relationship(
+        foreign_keys=[picture_id]
+    )
+    pictures: Mapped[List["Picture"]] = relationship(
+        back_populates="asset",
+        foreign_keys="[Picture.assets_id]"
+    )
