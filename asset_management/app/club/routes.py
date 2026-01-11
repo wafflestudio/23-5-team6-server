@@ -2,12 +2,20 @@ from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.orm import Session
+import secrets
+import string
 
 from asset_management.app.club.models import Club
 from asset_management.app.club.schemas import ClubCreate, ClubResponse, ClubUpdate
 from asset_management.database.session import get_session
 
 router = APIRouter(prefix="/clubs", tags=["clubs"])
+
+
+def generate_club_code(length: int = 6) -> str:
+    """랜덤 동아리 코드 생성 (대문자 + 숫자)"""
+    characters = string.ascii_uppercase + string.digits
+    return ''.join(secrets.choice(characters) for _ in range(length))
 
 
 @router.post(
@@ -17,7 +25,17 @@ router = APIRouter(prefix="/clubs", tags=["clubs"])
     summary="Create a club",
 )
 def create_club(payload: ClubCreate, session: Session = Depends(get_session)):
-    club = Club(name=payload.name)
+    while True:
+        club_code = generate_club_code()
+        existing = session.query(Club).filter(Club.club_code == club_code).first()
+        if not existing:
+            break
+
+    club = Club(
+        name=payload.name,
+        description=payload.description,
+        club_code=club_code,
+    )
     session.add(club)
     session.commit()
     session.refresh(club)
@@ -55,6 +73,9 @@ def update_club(
 
     if payload.name is not None:
         club.name = payload.name
+        
+    if payload.description is not None:
+        club.description = payload.description
 
     session.commit()
     session.refresh(club)
