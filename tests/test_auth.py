@@ -37,15 +37,20 @@ def auth_token(client, user_data):
   response = client.post(
     "/api/auth/login",
     json={"email": user_data["email"], "password": user_data["password"]})
-  return response.json()
+  return response.json()['tokens']
 
 def test_get_token(client: TestClient, user_data):
-  tokens = client.post(
+  response = client.post(
     "/api/auth/login",
     json={"email": user_data["email"], "password": user_data["password"]})
-  assert tokens.status_code == 200
-  tokens = tokens.json()
-  
+  assert response.status_code == 200
+  response = response.json()
+  assert 'tokens' in response
+  assert 'user_name' in response
+  assert 'user_type' in response
+  assert response['user_name'] == user_data['name']
+  # assert response['user_type'] == 0  ## 로그인 시스템 수정 후 변경 필요
+  tokens = response['tokens']
   assert "access_token" in tokens
   assert "refresh_token" in tokens
   access_token = jwt.decode(tokens["access_token"], AUTH_SETTINGS.ACCESS_TOKEN_SECRET)
@@ -98,7 +103,7 @@ def test_refresh_token(client: TestClient, user_data, auth_token):
 def test_logout(client: TestClient, auth_token):
   access_token = auth_token["refresh_token"]
 
-  response = client.get(
+  response = client.delete(
     "/api/auth/logout",
     headers={"Authorization": f"Bearer {access_token}"})
   assert response.status_code == 204

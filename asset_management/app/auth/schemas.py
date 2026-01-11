@@ -7,3 +7,7 @@ class UserSignin(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
+class LoginResponse(BaseModel):
+    user_name: str
+    user_type: int
+    tokens: TokenResponse

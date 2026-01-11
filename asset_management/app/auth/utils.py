@@ -6,6 +6,7 @@ from authlib.jose.errors import JoseError
 from fastapi import Depends, Header, HTTPException, status
 from typing import Annotated
 import hashlib
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 
 def issue_token(user_id: int) -> str:
@@ -31,14 +32,11 @@ def issue_token(user_id: int) -> str:
 
   return {"access_token": access_token, "refresh_token": refresh_token}
 
-def get_header_token(authorization: Annotated[str | None, Header()] = None) -> str:
-  if not authorization or not authorization.startswith("Bearer "):
-    raise HTTPException(
-      status_code=status.HTTP_401_UNAUTHORIZED,
-      detail="Invalid authorization header",
-      headers={"WWW-Authenticate": "Bearer"},
-    )
-  return authorization.split(" ")[1]
+# Security scheme for Swagger UI
+security = HTTPBearer()
+
+def get_header_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
+  return credentials.credentials
 
 def login_with_header(token: Annotated[str | None, Depends(get_header_token)] = None):
   return verify_token(token, AUTH_SETTINGS.ACCESS_TOKEN_SECRET, "access")

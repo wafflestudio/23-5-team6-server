@@ -26,7 +26,9 @@ class AuthServices:
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Invalid email or password",
       )
-    return self.issue_token(user.id)
+    user_name = user.name
+    user_type = user.is_admin
+    return {"user_name": user_name, "user_type": user_type, "tokens": self.issue_token(user.id)}
 
   def refresh_user_token(self, refresh_token: str):
     user_id = verify_token(refresh_token, AUTH_SETTINGS.REFRESH_TOKEN_SECRET, "refresh")
