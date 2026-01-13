@@ -67,9 +67,25 @@ def new_club_member(
       detail="Either club_id or club_code must be provided",
     )
 
-  # permission이 2(가입대기)가 아닌 경우에만 권한 체크
-  if request.permission != 2 and request.club_id is not None:
-    if not club_member_service.check_club_permission(user, request.club_id) == 1:
+  # permission이 2(가입대기)가 아닌 경우 관리자 권한 필요
+  if request.permission != 2:
+    # club_code 사용 시 먼저 club_id를 찾아서 권한 체크
+    if request.club_id is not None:
+      club_id_to_check = request.club_id
+    else:
+      # club_code로 club 찾기 (permission != 2일 때만)
+      from asset_management.app.club.models import Club
+      club = club_member_service.repository.db_session.query(Club).filter(
+        Club.club_code == request.club_code
+      ).first()
+      if club is None:
+        raise HTTPException(
+          status_code=status.HTTP_404_NOT_FOUND, detail="Club not found"
+        )
+      club_id_to_check = club.id
+    
+    # 관리자 권한 체크
+    if not club_member_service.check_club_permission(user, club_id_to_check) == 1:
       raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied"
       )
@@ -91,14 +107,21 @@ def delete_club_member(
   user=Depends(login_with_header),
   club_member_service: ClubMemberService = Depends(),
 ) -> None:
-  """동아리원 삭제"""
+  """동아리원 삭제 (관리자 또는 본인 탈퇴)"""
   members_response = club_member_service.get_club_members(id=member_id)
   if not members_response.items:
     raise HTTPException(
       status_code=status.HTTP_404_NOT_FOUND, detail="Member not found"
     )
-  club_id = members_response.items[0].club_id
-  if club_member_service.check_club_permission(user, club_id) == 1:
+  member = members_response.items[0]
+  club_id = member.club_id
+  user_id = member.user_id
+  
+  # 본인이거나 관리자면 삭제 가능
+  is_admin = club_member_service.check_club_permission(user, club_id) == 1
+  is_self = user == user_id
+  
+  if is_admin or is_self:
     club_member_service.delete_club_member(member_id)
   else:
     raise HTTPException(
