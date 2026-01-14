@@ -22,3 +22,14 @@ class ClubResponse(ClubBase):
     club_code: str
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ClubApplicationRequest(BaseModel):
+    club_code: str = Field(..., min_length=1, description="Club invitation code")
+
+
+class ClubApplicationResponse(BaseModel):
+    application_id: int
+    club_name: str
+    status: str  # "pending"
+    
