@@ -19,3 +19,20 @@ class ScheduleBase(BaseModel):
 
 class ScheduleCreate(ScheduleBase):
   pass
+
+class ScheduleResponse(ScheduleBase):
+  id: int
+
+class ScheduleUpdate(BaseModel):
+  start_date: datetime | None = None
+  end_date: datetime | None = None
+  asset_id: int | None = None
+  user_id: str | None = None
+  status: str | None = None
+
+class ScheduleListResponse(BaseModel):
+  schedules: list[ScheduleResponse]
+  total: int
+  page: int
+  size: int
+  pages: int
