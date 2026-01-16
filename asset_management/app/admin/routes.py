@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Annotated
 from sqlalchemy.orm import Session
 import secrets
 import string
@@ -16,6 +17,9 @@ from asset_management.app.admin.schemas import (
 from asset_management.database.session import get_session
 from asset_management.app.auth.utils import hash_password
 from asset_management.app.auth.dependencies import get_current_user
+
+from asset_management.app.assets.schemas import AssetCreateRequest, AssetUpdateRequest
+from asset_management.app.assets.services import AssetService
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -215,3 +219,70 @@ def approve_user(
         email=user.email,
         status=status_text,
     )
+
+
+
+
+
+@router.post("/assets", status_code=status.HTTP_201_CREATED)
+def add_asset(
+    asset: AssetCreateRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    asset_service: Annotated[AssetService, Depends()],
+    session: Session = Depends(get_session)
+):
+    
+    # Check if user is admin
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+    
+    # Get admin's club
+    admin_club = session.query(UserClublist).filter(
+        UserClublist.user_id == current_user.id,
+        UserClublist.permission == UserPermission.ADMIN.value
+    ).first()
+
+    return asset_service.create_asset_for_admin(admin_club.club_id, asset)
+    
+
+@router.patch("/assets/{asset_id}", status_code=status.HTTP_200_OK)
+def update_asset(
+    asset_id: int,
+    asset: AssetUpdateRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    asset_service: Annotated[AssetService, Depends()],
+    session: Session = Depends(get_session)
+):
+    # Check if user is admin
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+    
+    # Get admin's club
+    admin_club = session.query(UserClublist).filter(
+        UserClublist.user_id == current_user.id,
+        UserClublist.permission == UserPermission.ADMIN.value
+    ).first()
+
+    return asset_service.update_asset_for_admin(admin_club.club_id, asset_id, asset)
+
+@router.delete("/assets/{asset_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_asset(
+    asset_id: int,
+    current_user: Annotated[User, Depends(get_current_user)],
+    asset_service: Annotated[AssetService, Depends()],
+):
+    # Check if user is admin
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+    
+    
+    return asset_service.delete_asset_for_admin(asset_id)
