@@ -4,6 +4,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from asset_management.app.user.routes import router as user_router
 from asset_management.app.auth.router import router as auth_router
 from asset_management.app.club.routes import router as club_router
+from asset_management.app.club.application_routes import router as club_application_router
+from asset_management.app.admin.routes import router as admin_router
+from asset_management.app.assets.router import router as asset_router
 from asset_management.app.club_member.router import router as club_member_router
 from asset_management.app.schedule.router import router as schedule_router
 
@@ -28,5 +31,8 @@ def health_check():
 app.include_router(user_router, prefix="/api")
 app.include_router(auth_router, prefix="/api")
 app.include_router(club_router, prefix="/api")
+app.include_router(club_application_router, prefix="/api")
+app.include_router(admin_router, prefix="/api")
+app.include_router(asset_router, prefix="/api")
 app.include_router(club_member_router, prefix="/api")
 app.include_router(schedule_router, prefix="/api")

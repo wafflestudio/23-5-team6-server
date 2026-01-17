@@ -1,8 +1,8 @@
-"""init
+"""스키마 초기화 및 재작성
 
-Revision ID: 577265257e64
+Revision ID: 44e7b9789956
 Revises: 
-Create Date: 2026-01-04 19:27:16.196007
+Create Date: 2026-01-16 05:34:40.165367
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '577265257e64'
+revision: str = '44e7b9789956'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -29,7 +29,10 @@ def upgrade() -> None:
     op.create_table('club',
     sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('name', sa.String(length=30), nullable=False),
-    sa.PrimaryKeyConstraint('id')
+    sa.Column('description', sa.String(length=255), nullable=True),
+    sa.Column('club_code', sa.String(length=50), nullable=False),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('club_code')
     )
     op.create_table('user',
     sa.Column('id', sa.String(length=36), nullable=False),
@@ -37,17 +40,36 @@ def upgrade() -> None:
     sa.Column('email', sa.String(length=30), nullable=True),
     sa.Column('hashed_password', sa.String(length=64), nullable=True),
     sa.Column('social_email', sa.String(length=30), nullable=True),
+    sa.Column('is_admin', sa.Boolean(), nullable=False),
+    sa.Column('student_id', sa.String(length=10), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('assets',
     sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('name', sa.String(length=50), nullable=False),
+    sa.Column('status', sa.Integer(), nullable=False),
+    sa.Column('description', sa.String(length=500), nullable=True),
+    sa.Column('total_quantity', sa.Integer(), nullable=False),
+    sa.Column('available_quantity', sa.Integer(), nullable=False),
+    sa.Column('location', sa.String(length=100), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('club_id', sa.Integer(), nullable=False),
     sa.Column('category_id', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['category_id'], ['category.id'], ),
     sa.ForeignKeyConstraint(['club_id'], ['club.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
+    op.create_table('refresh_tokens',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('token', sa.String(length=255), nullable=True),
+    sa.Column('expires_at', sa.DateTime(), nullable=False),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('user_id', sa.String(length=36), nullable=False),
+    sa.ForeignKeyConstraint(['user_id'], ['user.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_refresh_tokens_id'), 'refresh_tokens', ['id'], unique=False)
+    op.create_index(op.f('ix_refresh_tokens_token'), 'refresh_tokens', ['token'], unique=True)
     op.create_table('user_clublist',
     sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('user_id', sa.String(length=36), nullable=False),
@@ -62,15 +84,19 @@ def upgrade() -> None:
     sa.Column('user_id', sa.String(length=36), nullable=False),
     sa.Column('asset_id', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['asset_id'], ['assets.id'], ),
-    sa.PrimaryKeyConstraint('id', 'user_id')
+    sa.ForeignKeyConstraint(['user_id'], ['user.id'], ),
+    sa.PrimaryKeyConstraint('id')
     )
     op.create_table('picture',
     sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('date', sa.DateTime(), nullable=False),
     sa.Column('assets_id', sa.Integer(), nullable=False),
+    sa.Column('is_main', sa.Boolean(), nullable=False),
+    sa.Column('user_id', sa.String(length=36), nullable=False),
     sa.Column('category_id', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['assets_id'], ['assets.id'], ),
     sa.ForeignKeyConstraint(['category_id'], ['category.id'], ),
+    sa.ForeignKeyConstraint(['user_id'], ['user.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('schedule',
@@ -80,7 +106,8 @@ def upgrade() -> None:
     sa.Column('asset_id', sa.Integer(), nullable=False),
     sa.Column('user_id', sa.String(length=36), nullable=False),
     sa.ForeignKeyConstraint(['asset_id'], ['assets.id'], ),
-    sa.PrimaryKeyConstraint('id', 'user_id')
+    sa.ForeignKeyConstraint(['user_id'], ['user.id'], ),
+    sa.PrimaryKeyConstraint('id')
     )
     # ### end Alembic commands ###
 
@@ -92,6 +119,9 @@ def downgrade() -> None:
     op.drop_table('picture')
     op.drop_table('favorite')
     op.drop_table('user_clublist')
+    op.drop_index(op.f('ix_refresh_tokens_token'), table_name='refresh_tokens')
+    op.drop_index(op.f('ix_refresh_tokens_id'), table_name='refresh_tokens')
+    op.drop_table('refresh_tokens')
     op.drop_table('assets')
     op.drop_table('user')
     op.drop_table('club')

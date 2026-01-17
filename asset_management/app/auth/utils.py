@@ -64,4 +64,37 @@ def refresh_token(token: Annotated[str | None, Depends(get_header_token)] = None
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
   return hashlib.sha256(plain_password.encode("utf-8")).hexdigest() == hashed_password
+
+def check_club_permission(user_club_id: int, resource_club_id: int, auth_repository: Annotated[AuthRepository, Depends()]) -> int:
+  """Check if the user has permission for the club resource.
+  Args:
+      user_club_id (int): The ID of the user's club.
+      resource_club_id (int): The ID of the resource's club.
+      auth_repository (AuthRepository): The authentication repository.
+  Returns:
+          int: The permission level of the user for the club resource.
+              0: user
+              1: admin
+  Raises:
+      HTTPException(403): If the user does not have any permission for the club resource.
+  """
+  userclubinfo = auth_repository.club_permission(user_club_id, resource_club_id)
   
+  if userclubinfo is None:
+    raise HTTPException(
+      status_code=status.HTTP_403_FORBIDDEN,
+      detail="User does not have permission for this club resource",
+    )
+  
+  return userclubinfo.permission
+
+def hash_password(password: str) -> str:
+  """Hash the password using SHA-256.
+  
+  Args:
+      password (str): The plain text password.
+  
+  Returns:
+      str: The hashed password.
+  """
+  return hashlib.sha256(password.encode("utf-8")).hexdigest()

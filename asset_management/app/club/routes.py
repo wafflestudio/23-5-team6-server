@@ -2,44 +2,13 @@ from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.orm import Session
-import secrets
-import string
 
 from asset_management.app.club.models import Club
-from asset_management.app.club.schemas import ClubCreate, ClubResponse, ClubUpdate
+from asset_management.app.club.schemas import ClubResponse, ClubUpdate
 from asset_management.database.session import get_session
+from asset_management.app.user.models import UserClublist
 
 router = APIRouter(prefix="/clubs", tags=["clubs"])
-
-
-def generate_club_code(length: int = 6) -> str:
-    """랜덤 동아리 코드 생성 (대문자 + 숫자)"""
-    characters = string.ascii_uppercase + string.digits
-    return ''.join(secrets.choice(characters) for _ in range(length))
-
-
-@router.post(
-    "",
-    status_code=status.HTTP_201_CREATED,
-    response_model=ClubResponse,
-    summary="Create a club",
-)
-def create_club(payload: ClubCreate, session: Session = Depends(get_session)):
-    while True:
-        club_code = generate_club_code()
-        existing = session.query(Club).filter(Club.club_code == club_code).first()
-        if not existing:
-            break
-
-    club = Club(
-        name=payload.name,
-        description=payload.description,
-        club_code=club_code,
-    )
-    session.add(club)
-    session.commit()
-    session.refresh(club)
-    return club
 
 
 @router.get("", response_model=List[ClubResponse], summary="List clubs")
@@ -89,6 +58,9 @@ def update_club(
 )
 def delete_club(club_id: int, session: Session = Depends(get_session)):
     club = session.query(Club).filter(Club.id == club_id).first()
+    club_members = session.query(UserClublist).filter(UserClublist.club_id == club_id).all()
+    for member in club_members:
+        session.delete(member)
     if not club:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Club not found")
 
