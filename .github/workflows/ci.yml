@@ -52,6 +52,17 @@ jobs:
         run: pip install -e .
       
       - name: 모든 모듈 Import 검증
+        env:
+          # 테스트용 더미 값 (실제 DB 연결 없이 import만 검증)
+          DB_DIALECT: sqlite
+          DB_DRIVER: pysqlite
+          DB_HOST: ""
+          DB_PORT: "0"
+          DB_USER: ""
+          DB_PASSWORD: ""
+          DB_DATABASE: ":memory:"
+          ACCESS_TOKEN_SECRET: "test-secret-for-ci"
+          REFRESH_TOKEN_SECRET: "test-secret-for-ci"
         run: |
           echo "📦 모든 Python 모듈 import 테스트..."
           python -c "
@@ -119,16 +130,28 @@ jobs:
       
       - name: FastAPI 앱 시작 테스트
         env:
-          # 테스트용 환경 변수 (실제 DB 연결 없이)
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: "test-secret-key-for-ci"
-          GOOGLE_CLIENT_ID: "test-client-id"
-          GOOGLE_CLIENT_SECRET: "test-client-secret"
+          # 테스트용 더미 값 (실제 DB 연결 없이 앱 로드만 검증)
+          DB_DIALECT: sqlite
+          DB_DRIVER: pysqlite
+          DB_HOST: ""
+          DB_PORT: "0"
+          DB_USER: ""
+          DB_PASSWORD: ""
+          DB_DATABASE: ":memory:"
+          ACCESS_TOKEN_SECRET: "test-secret-for-ci"
+          REFRESH_TOKEN_SECRET: "test-secret-for-ci"
         run: |
           echo "🚀 FastAPI 앱 시작 검증..."
           python -c "
           import sys
           try:
+              # DB 스키마 먼저 생성
+              from asset_management.database.common import Base
+              from asset_management.database.session import ENGINE
+              from asset_management.database import import_models
+              import_models()
+              Base.metadata.create_all(bind=ENGINE)
+              
               from asset_management.main import app
               
               # FastAPI 앱 객체 검증
@@ -157,13 +180,26 @@ jobs:
       
       - name: OpenAPI 스키마 생성 테스트
         env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          SECRET_KEY: "test-secret-key-for-ci"
-          GOOGLE_CLIENT_ID: "test-client-id"
-          GOOGLE_CLIENT_SECRET: "test-client-secret"
+          # 테스트용 더미 값
+          DB_DIALECT: sqlite
+          DB_DRIVER: pysqlite
+          DB_HOST: ""
+          DB_PORT: "0"
+          DB_USER: ""
+          DB_PASSWORD: ""
+          DB_DATABASE: ":memory:"
+          ACCESS_TOKEN_SECRET: "test-secret-for-ci"
+          REFRESH_TOKEN_SECRET: "test-secret-for-ci"
         run: |
           echo "📄 OpenAPI 스키마 생성 테스트..."
           python -c "
+          # DB 스키마 먼저 생성
+          from asset_management.database.common import Base
+          from asset_management.database.session import ENGINE
+          from asset_management.database import import_models
+          import_models()
+          Base.metadata.create_all(bind=ENGINE)
+          
           from asset_management.main import app
           schema = app.openapi()
           assert 'paths' in schema, 'OpenAPI 스키마에 paths가 없습니다'
@@ -174,20 +210,6 @@ jobs:
   test:
     runs-on: ubuntu-latest
     needs: [import-check]  # import 체크 통과 후 테스트 실행
-    
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: test_password
-          MYSQL_DATABASE: test_db
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=3
     
     steps:
       - uses: actions/checkout@v4
@@ -200,14 +222,20 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -e .
-          pip install pytest pytest-asyncio httpx aiosqlite
+          pip install pytest pytest-asyncio httpx
       
       - name: 테스트 실행
         env:
-          DATABASE_URL: "mysql+aiomysql://root:test_password@localhost:3306/test_db"
-          SECRET_KEY: "test-secret-key"
-          GOOGLE_CLIENT_ID: "test-client-id"
-          GOOGLE_CLIENT_SECRET: "test-client-secret"
+          # 인메모리 SQLite로 테스트
+          DB_DIALECT: sqlite
+          DB_DRIVER: pysqlite
+          DB_HOST: ""
+          DB_PORT: "0"
+          DB_USER: ""
+          DB_PASSWORD: ""
+          DB_DATABASE: ":memory:"
+          ACCESS_TOKEN_SECRET: "test-secret-for-ci"
+          REFRESH_TOKEN_SECRET: "test-secret-for-ci"
         run: |
           echo "🧪 pytest 실행..."
           pytest tests/ -v --tb=short
