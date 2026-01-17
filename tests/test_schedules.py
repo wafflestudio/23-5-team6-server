@@ -161,6 +161,7 @@ def test_create_schedule_success(
     assert "id" in data
     assert data["asset_id"] == schedule_payload["asset_id"]
     assert data["user_id"] == schedule_payload["user_id"]
+    assert data["club_id"] == club_id
     assert data["status"] == schedule_payload["status"]
 
 

@@ -8,6 +8,7 @@ from asset_management.database.common import Base
 if TYPE_CHECKING:
     from asset_management.app.assets.models import Asset
     from asset_management.app.user.models import User
+    from asset_management.app.club.models import Club
 from enum import Enum
 
 class Status(Enum):
@@ -25,8 +26,10 @@ class Schedule(Base):
     end_date: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     asset_id: Mapped[int] = mapped_column(ForeignKey("assets.id"), nullable=False)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("user.id"), nullable=False)
+    club_id: Mapped[int] = mapped_column(ForeignKey("club.id"), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default=Status.PENDING.value) 
 
     # Relationships
     asset: Mapped["Asset"] = relationship(back_populates="schedules")
     user: Mapped["User"] = relationship(back_populates="schedules")
+    club: Mapped["Club"] = relationship(back_populates="schedules")

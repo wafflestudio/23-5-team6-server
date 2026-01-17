@@ -29,6 +29,7 @@ class ScheduleService:
     schedules = self.repository.get_schedules(
       page=page,
       size=size,
+      club_id=club_id,
       status=status,
       user_id=user_id,
       asset_id=asset_id,
@@ -44,6 +45,7 @@ class ScheduleService:
           end_date=s.end_date,
           asset_id=s.asset_id,
           user_id=s.user_id,
+          club_id=s.club_id,
           status=s.status,
         ) for s in schedules.items
       ],
@@ -58,7 +60,7 @@ class ScheduleService:
   ) -> ScheduleResponse:
     # 중복 스케줄 체크 (선택적)
     schedule = self.repository.add_schedule(
-      Schedule(**schedule_data.model_dump())
+      Schedule(club_id=club_id, **schedule_data.model_dump())
     )
     return ScheduleResponse(
       id=schedule.id,
@@ -66,6 +68,7 @@ class ScheduleService:
       end_date=schedule.end_date,
       asset_id=schedule.asset_id,
       user_id=schedule.user_id,
+      club_id=schedule.club_id,
       status=schedule.status,
     )
 
@@ -81,6 +84,7 @@ class ScheduleService:
       end_date=updated_schedule.end_date,
       asset_id=updated_schedule.asset_id,
       user_id=updated_schedule.user_id,
+      club_id=updated_schedule.club_id,
       status=updated_schedule.status,
     )
 
