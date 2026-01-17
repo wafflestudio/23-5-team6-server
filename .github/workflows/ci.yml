@@ -25,6 +25,17 @@ jobs:
           pip install -e .
       
       - name: Check for multiple heads
+        env:
+          # Alembic이 env.py에서 DB_SETTINGS를 import하므로 필요
+          DB_DIALECT: sqlite
+          DB_DRIVER: pysqlite
+          DB_HOST: ""
+          DB_PORT: "0"
+          DB_USER: ""
+          DB_PASSWORD: ""
+          DB_DATABASE: ":memory:"
+          ACCESS_TOKEN_SECRET: "test-secret-for-ci"
+          REFRESH_TOKEN_SECRET: "test-secret-for-ci"
         run: |
           echo "🔍 Alembic 다중 헤드 체크..."
           HEAD_COUNT=$(alembic heads 2>/dev/null | wc -l)
@@ -43,6 +54,17 @@ jobs:
           alembic heads
       
       - name: Verify migration chain
+        env:
+          # Alembic 명령어에도 환경변수 필요
+          DB_DIALECT: sqlite
+          DB_DRIVER: pysqlite
+          DB_HOST: ""
+          DB_PORT: "0"
+          DB_USER: ""
+          DB_PASSWORD: ""
+          DB_DATABASE: ":memory:"
+          ACCESS_TOKEN_SECRET: "test-secret-for-ci"
+          REFRESH_TOKEN_SECRET: "test-secret-for-ci"
         run: |
           echo "🔗 마이그레이션 체인 검증..."
           alembic history --verbose
