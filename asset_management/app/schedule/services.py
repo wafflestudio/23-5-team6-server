@@ -29,7 +29,6 @@ class ScheduleService:
     schedules = self.repository.get_schedules(
       page=page,
       size=size,
-      club_id=club_id,
       status=status,
       user_id=user_id,
       asset_id=asset_id,
@@ -38,32 +37,57 @@ class ScheduleService:
     )
 
     return ScheduleListResponse(
-      schedules=[ScheduleResponse(**x) for x in schedules],
+      schedules=[
+        ScheduleResponse(
+          id=s.id,
+          start_date=s.start_date,
+          end_date=s.end_date,
+          asset_id=s.asset_id,
+          user_id=s.user_id,
+          status=s.status,
+        ) for s in schedules.items
+      ],
       total=schedules.total,
-      page=schedules.page,
-      size=schedules.size,
+      page=page,
+      size=size,
       pages=schedules.pages,
     )
 
   def create_schedule(
     self, club_id: int, schedule_data: ScheduleCreate
   ) -> ScheduleResponse:
-    self.repository.get_schedules(
-      club_id=club_id,
-      asset_id=schedule_data.asset_id,
-      status=Status.APPROVED.value,
-    )
+    # 중복 스케줄 체크 (선택적)
     schedule = self.repository.add_schedule(
-      Schedule(club_id=club_id, **schedule_data.model_dump())
+      Schedule(**schedule_data.model_dump())
     )
-    return ScheduleResponse(**schedule)
+    return ScheduleResponse(
+      id=schedule.id,
+      start_date=schedule.start_date,
+      end_date=schedule.end_date,
+      asset_id=schedule.asset_id,
+      user_id=schedule.user_id,
+      status=schedule.status,
+    )
 
-  def update_schedule(self, schedule: ScheduleUpdate) -> ScheduleResponse:
-    updated_schedule = self.repository.update_schedule(schedule)
-    return ScheduleResponse(**updated_schedule)
+  def update_schedule(self, schedule_id: int, schedule_data: ScheduleUpdate) -> ScheduleResponse:
+    # 업데이트할 필드만 추출
+    update_dict = {k: v for k, v in schedule_data.model_dump().items() if v is not None}
+    updated_schedule = self.repository.update_schedule(schedule_id, **update_dict)
+    if not updated_schedule:
+      raise HTTPException(status_code=404, detail="Schedule not found")
+    return ScheduleResponse(
+      id=updated_schedule.id,
+      start_date=updated_schedule.start_date,
+      end_date=updated_schedule.end_date,
+      asset_id=updated_schedule.asset_id,
+      user_id=updated_schedule.user_id,
+      status=updated_schedule.status,
+    )
 
   def delete_schedule(self, schedule_id: int, user_id: str) -> None:
-    schedule = self.repository.get_schedules(schedule_id=schedule_id)
+    schedule = self.repository.get_schedule_by_id(schedule_id)
+    if not schedule:
+      raise HTTPException(status_code=404, detail="Schedule not found")
     if schedule.user_id != user_id and not self.is_admin(user_id):
       raise HTTPException(status_code=403, detail="Not authorized to delete this schedule")
     self.repository.delete_schedule(schedule_id)

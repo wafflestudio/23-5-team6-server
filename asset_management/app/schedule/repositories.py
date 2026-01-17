@@ -38,6 +38,9 @@ class ScheduleRepository:
         self.db_session.refresh(schedule)
         return schedule
 
+    def get_schedule_by_id(self, schedule_id: int) -> Schedule | None:
+        return self.db_session.query(Schedule).filter(Schedule.id == schedule_id).first()
+
     def delete_schedule(self, schedule_id: int) -> bool:
         schedule = self.db_session.query(Schedule).filter(Schedule.id == schedule_id).first()
         if not schedule:

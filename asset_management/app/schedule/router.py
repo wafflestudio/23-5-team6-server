@@ -18,7 +18,7 @@ router = APIRouter(prefix="/schedules", tags=["schedules"])
 def get_schedules(
   schedule_service: Annotated[ScheduleService, Depends()] ,
   club_id: int,
-  status: int | None = None,
+  status: str | None = None,
   user_id: str | None = None,
   asset_id: int | None = None,
   start_date: datetime | None = None,
@@ -66,7 +66,7 @@ def update_schedule(
   """대여 수정
 
   승인/반납/취소 등의 상태 변경이 가능하며, 날짜 변경 또한 가능합니다."""
-  return schedule_service.update_schedule(request)
+  return schedule_service.update_schedule(schedule_id, request)
 
 
 @router.delete("/{schedule_id}", status_code=204)
