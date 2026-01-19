@@ -31,6 +31,7 @@ class ClubMemberService:
         ClubMember(
           id=member.id,
           user_id=member.user_id,
+          name=member.user.name,
           club_id=member.club_id,
           permission=member.permission,
         )
@@ -51,6 +52,7 @@ class ClubMemberService:
         ClubMember(
           id=member.id,
           user_id=member.user_id,
+          name=member.user.name,
           club_id=member.club_id,
           permission=member.permission,
         )
@@ -69,6 +71,7 @@ class ClubMemberService:
     return ClubMember(
       id=member.id,
       user_id=member.user_id,
+      name=member.user.name,
       club_id=member.club_id,
       permission=member.permission,
     )
@@ -98,6 +101,7 @@ class ClubMemberService:
     return ClubMember(
       id=member.id,
       user_id=member.user_id,
+      name=member.user.name,
       club_id=member.club_id,
       permission=member.permission,
     )
@@ -118,6 +122,7 @@ class ClubMemberService:
     return ClubMember(
       id=member.id,
       user_id=member.user_id,
+      name=member.user.name,
       club_id=member.club_id,
       permission=member.permission,
     )

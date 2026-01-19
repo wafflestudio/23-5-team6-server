@@ -1,6 +1,6 @@
 from asset_management.database.session import get_session
 from typing import Annotated, List
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from fastapi import Depends
 from asset_management.app.user.models import UserClublist
 from sqlalchemy_pagination import paginate
@@ -20,7 +20,7 @@ class ClubMemberRepository:
         page: int = 1,
         size: int = 10,
     ) -> List[UserClublist]:
-        query = self.db_session.query(UserClublist)
+        query = self.db_session.query(UserClublist).options(joinedload(UserClublist.user))
         if id is not None:
             query = query.filter(UserClublist.id == id)
         if club_id is not None:
@@ -42,6 +42,8 @@ class ClubMemberRepository:
         self.db_session.add(new_member)
         self.db_session.commit()
         self.db_session.refresh(new_member)
+        # Load the user relationship
+        self.db_session.refresh(new_member, ["user"])
         return new_member
     
     def create_club_member_with_code(
@@ -62,6 +64,8 @@ class ClubMemberRepository:
         self.db_session.add(new_member)
         self.db_session.commit()
         self.db_session.refresh(new_member)
+        # Load the user relationship
+        self.db_session.refresh(new_member, ["user"])
         return new_member
 
     def edit_club_member(
@@ -69,6 +73,7 @@ class ClubMemberRepository:
     ) -> UserClublist | None:
         member = (
             self.db_session.query(UserClublist)
+            .options(joinedload(UserClublist.user))
             .filter(
                 UserClublist.id == member_id,
             )
