@@ -24,12 +24,12 @@ class Asset(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=func.now())
 
     club_id: Mapped[int] = mapped_column(ForeignKey("club.id"), nullable=False)
-    category_id: Mapped[int] = mapped_column(ForeignKey("category.id"), nullable=False)
+    category_id: Mapped[Optional[int]] = mapped_column(ForeignKey("category.id"), nullable=True)
     # picture_id: Mapped[Optional[int]] = mapped_column(ForeignKey("picture.id"), nullable=True)
 
     # Relationships
     club: Mapped["Club"] = relationship(back_populates="assets")
-    category: Mapped["Category"] = relationship(back_populates="assets")
+    category: Mapped[Optional["Category"]] = relationship(back_populates="assets")
     schedules: Mapped[List["Schedule"]] = relationship(back_populates="asset")
     favorites: Mapped[List["Favorite"]] = relationship(back_populates="asset")
     # main_picture: Mapped[Optional["Picture"]] = relationship(
