@@ -88,16 +88,8 @@ class RentalService:
 
     def return_item(self, rental_id: str, user_id: str) -> RentalResponse:
         """물품 반납"""
-        # rental-001 형식에서 ID 추출
-        try:
-            schedule_id = int(rental_id.split("-")[1])
-        except (IndexError, ValueError):
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="존재하지 않는 대여 기록",
-            )
 
-        schedule = self.db_session.query(Schedule).filter(Schedule.id == schedule_id).first()
+        schedule = self.db_session.query(Schedule).filter(Schedule.id == rental_id).first()
         
         if not schedule:
             raise HTTPException(
