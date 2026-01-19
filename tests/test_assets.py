@@ -63,10 +63,11 @@ def admin_headers(admin_access_token: str) -> dict:
 
 
 @pytest.fixture(scope="function")
-def asset_payload() -> dict:
+def asset_payload(signed_up_admin: dict) -> dict:
     return {
         "name": "테스트 물품",
         "description": "테스트 설명",
+        "club_id": signed_up_admin["club_id"],
         "category_id": None,
         "quantity": 3,
         "location": "동아리방",
@@ -138,6 +139,7 @@ def test_admin_update_asset(
     asset_id = created_asset["id"]
     patch_payload = {
         "name": "수정된 물품",
+        "club_id": signed_up_admin["club_id"],
         "quantity": 5,
         "location": "창고",
         # description/category_id는 선택적으로 업데이트
