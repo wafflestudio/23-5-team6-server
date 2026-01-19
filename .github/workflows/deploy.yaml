@@ -1,11 +1,16 @@
-name: CI/CD Pipeline
+name: Deploy to Production
 on:
-  push:
+  workflow_run:
+    workflows: ["FastAPI CI"]
+    types:
+      - completed
     branches:
       - main
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}  # CI 성공 시에만 실행
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2

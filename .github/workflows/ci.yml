@@ -1,0 +1,290 @@
+name: FastAPI CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  alembic-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 전체 히스토리 가져오기
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: Install dependencies
+        run: |
+          pip install alembic sqlalchemy
+          pip install -e .
+      
+      - name: Check for multiple heads
+        env:
+          # Alembic이 env.py에서 DB_SETTINGS를 import하므로 필요
+          DB_DIALECT: sqlite
+          DB_DRIVER: pysqlite
+          DB_HOST: ""
+          DB_PORT: "0"
+          DB_USER: ""
+          DB_PASSWORD: ""
+          DB_DATABASE: ":memory:"
+          ACCESS_TOKEN_SECRET: "test-secret-for-ci"
+          REFRESH_TOKEN_SECRET: "test-secret-for-ci"
+        run: |
+          echo "🔍 Alembic 다중 헤드 체크..."
+          HEAD_COUNT=$(alembic heads 2>/dev/null | wc -l)
+          
+          if [ "$HEAD_COUNT" -gt 1 ]; then
+            echo "::error::다중 마이그레이션 헤드가 감지되었습니다!"
+            echo ""
+            echo "현재 헤드 목록:"
+            alembic heads
+            echo ""
+            echo "해결 방법: alembic merge heads -m 'merge_migrations'"
+            exit 1
+          fi
+          
+          echo "✅ 단일 마이그레이션 헤드 확인"
+          alembic heads
+      
+      - name: Verify migration chain
+        env:
+          # Alembic 명령어에도 환경변수 필요
+          DB_DIALECT: sqlite
+          DB_DRIVER: pysqlite
+          DB_HOST: ""
+          DB_PORT: "0"
+          DB_USER: ""
+          DB_PASSWORD: ""
+          DB_DATABASE: ":memory:"
+          ACCESS_TOKEN_SECRET: "test-secret-for-ci"
+          REFRESH_TOKEN_SECRET: "test-secret-for-ci"
+        run: |
+          echo "🔗 마이그레이션 체인 검증..."
+          alembic history --verbose
+          
+          # 마이그레이션 upgrade dry-run (offline 모드)
+          echo "📝 마이그레이션 검증 중..."
+          alembic upgrade head --sql > /dev/null 2>&1 || {
+            echo "::error::마이그레이션 체인에 문제가 있습니다!"
+            exit 1
+          }
+          echo "✅ 마이그레이션 체인 정상"
+
+  import-check:
+    runs-on: ubuntu-latest
+    needs: [alembic-check]  # 이전 job들 통과 후 실행
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: Install dependencies
+        run: pip install -e .
+      
+      - name: 모든 모듈 Import 검증
+        env:
+          # 테스트용 더미 값 (실제 DB 연결 없이 import만 검증)
+          DB_DIALECT: sqlite
+          DB_DRIVER: pysqlite
+          DB_HOST: ""
+          DB_PORT: "0"
+          DB_USER: ""
+          DB_PASSWORD: ""
+          DB_DATABASE: ":memory:"
+          ACCESS_TOKEN_SECRET: "test-secret-for-ci"
+          REFRESH_TOKEN_SECRET: "test-secret-for-ci"
+        run: |
+          echo "📦 모든 Python 모듈 import 테스트..."
+          python -c "
+          import sys
+          import importlib
+          import pkgutil
+          
+          errors = []
+          
+          # 메인 패키지 import
+          try:
+              import asset_management
+              print('✅ asset_management 패키지 import 성공')
+          except Exception as e:
+              errors.append(f'asset_management: {e}')
+              print(f'❌ asset_management: {e}')
+          
+          # 모든 서브모듈 import
+          modules = [
+              'asset_management.main',
+              'asset_management.app.user.routes',
+              'asset_management.app.user.models',
+              'asset_management.app.auth.router',
+              'asset_management.app.auth.models',
+              'asset_management.app.auth.services',
+              'asset_management.app.club.routes',
+              'asset_management.app.club.models',
+              'asset_management.app.assets.router',
+              'asset_management.app.assets.models',
+              'asset_management.app.assets.services',
+              'asset_management.app.schedule.models',
+              'asset_management.app.club_member.router',
+              'asset_management.app.admin.routes',
+              'asset_management.app.category.models',
+              'asset_management.database.session',
+          ]
+          
+          for module in modules:
+              try:
+                  importlib.import_module(module)
+                  print(f'✅ {module}')
+              except Exception as e:
+                  errors.append(f'{module}: {e}')
+                  print(f'❌ {module}: {e}')
+          
+          if errors:
+              print(f'\n❌ {len(errors)}개 모듈에서 import 에러 발생!')
+              sys.exit(1)
+          else:
+              print(f'\n✅ 모든 모듈 import 성공!')
+          "
+
+  app-startup-check:
+    runs-on: ubuntu-latest
+    needs: [import-check]  # import 체크 통과 후 실행
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: Install dependencies
+        run: pip install -e .
+      
+      - name: FastAPI 앱 시작 테스트
+        env:
+          # 테스트용 더미 값 (실제 DB 연결 없이 앱 로드만 검증)
+          DB_DIALECT: sqlite
+          DB_DRIVER: pysqlite
+          DB_HOST: ""
+          DB_PORT: "0"
+          DB_USER: ""
+          DB_PASSWORD: ""
+          DB_DATABASE: ":memory:"
+          ACCESS_TOKEN_SECRET: "test-secret-for-ci"
+          REFRESH_TOKEN_SECRET: "test-secret-for-ci"
+        run: |
+          echo "🚀 FastAPI 앱 시작 검증..."
+          python -c "
+          import sys
+          try:
+              # DB 스키마 먼저 생성
+              from asset_management.database.common import Base
+              from asset_management.database.session import ENGINE
+              from asset_management.database import import_models
+              import_models()
+              Base.metadata.create_all(bind=ENGINE)
+              
+              from asset_management.main import app
+              
+              # FastAPI 앱 객체 검증
+              assert app is not None, 'app이 None입니다'
+              assert hasattr(app, 'routes'), 'routes 속성이 없습니다'
+              
+              # 라우터 등록 확인
+              route_paths = [route.path for route in app.routes]
+              print(f'등록된 라우트 수: {len(route_paths)}')
+              
+              # 필수 엔드포인트 확인
+              required_endpoints = ['/health', '/api']
+              for endpoint in required_endpoints:
+                  if any(endpoint in path for path in route_paths):
+                      print(f'✅ {endpoint} 엔드포인트 확인')
+                  else:
+                      print(f'⚠️ {endpoint} 엔드포인트 미확인')
+              
+              print('✅ FastAPI 앱 로드 성공!')
+          except Exception as e:
+              print(f'❌ FastAPI 앱 로드 실패: {e}')
+              import traceback
+              traceback.print_exc()
+              sys.exit(1)
+          "
+      
+      - name: OpenAPI 스키마 생성 테스트
+        env:
+          # 테스트용 더미 값
+          DB_DIALECT: sqlite
+          DB_DRIVER: pysqlite
+          DB_HOST: ""
+          DB_PORT: "0"
+          DB_USER: ""
+          DB_PASSWORD: ""
+          DB_DATABASE: ":memory:"
+          ACCESS_TOKEN_SECRET: "test-secret-for-ci"
+          REFRESH_TOKEN_SECRET: "test-secret-for-ci"
+        run: |
+          echo "📄 OpenAPI 스키마 생성 테스트..."
+          python -c "
+          # DB 스키마 먼저 생성
+          from asset_management.database.common import Base
+          from asset_management.database.session import ENGINE
+          from asset_management.database import import_models
+          import_models()
+          Base.metadata.create_all(bind=ENGINE)
+          
+          from asset_management.main import app
+          schema = app.openapi()
+          assert 'paths' in schema, 'OpenAPI 스키마에 paths가 없습니다'
+          assert 'info' in schema, 'OpenAPI 스키마에 info가 없습니다'
+          print(f'✅ OpenAPI 스키마 생성 성공 ({len(schema[\"paths\"])} 엔드포인트)')
+          "
+
+  test:
+    runs-on: ubuntu-latest
+    needs: [app-startup-check]  # app-startup-check 통과 후 테스트 실행
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: Install dependencies
+        run: |
+          pip install -e .
+          pip install pytest pytest-asyncio httpx
+      
+      - name: 테스트 실행
+        env:
+          # 인메모리 SQLite로 테스트
+          DB_DIALECT: sqlite
+          DB_DRIVER: pysqlite
+          DB_HOST: ""
+          DB_PORT: "0"
+          DB_USER: ""
+          DB_PASSWORD: ""
+          DB_DATABASE: ":memory:"
+          ACCESS_TOKEN_SECRET: "test-secret-for-ci"
+          REFRESH_TOKEN_SECRET: "test-secret-for-ci"
+        run: |
+          echo "🧪 pytest 실행..."
+          pytest tests/ -v --tb=short
+
+  # 모든 체크 통과 확인 (Branch Protection에 사용)
+  ci-success:
+    runs-on: ubuntu-latest
+    needs: [alembic-check, import-check, app-startup-check, test]
+    steps:
+      - name: CI 성공
+        run: echo "✅ 모든 CI 체크 통과!"
