@@ -2,3 +2,4 @@ __pycache__/
 .env.local
 .env.prod
 .venv/
+*.local.*

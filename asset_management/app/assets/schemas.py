@@ -6,8 +6,10 @@ from pydantic import BaseModel, Field
 class AssetResponse(BaseModel):
     id: int
     name: str
-    status: int
     description: Optional[str] = None
+    
+    # Schedule 기반 대여 상태 (0: 대여 가능, 1: 대여 중)
+    status: int = 0
 
     category_id: Optional[int] = None
     category_name: Optional[str] = None

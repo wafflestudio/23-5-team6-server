@@ -1,13 +1,9 @@
-from typing import Annotated, Optional, Union, List
+from typing import Annotated, List
 
 from fastapi import Depends
 from asset_management.app.assets.repositories import AssetRepository
 from asset_management.app.assets.schemas import AssetCreateRequest, AssetResponse, AssetUpdateRequest
-# from asset_management.app.assets.exceptions import (
-# )
 from asset_management.app.assets.models import Asset
-
-# from asset_management.app.category.services import CategoryService
 
 
 class AssetService:
@@ -37,7 +33,7 @@ class AssetService:
         return AssetResponse(
             id=new_asset.id,
             name=new_asset.name,
-            status=new_asset.status,
+            status=0,
             description=new_asset.description,
             club_id=new_asset.club_id,
             category_id=new_asset.category_id,
@@ -71,12 +67,13 @@ class AssetService:
             id=updated_asset.id,
             name=updated_asset.name,
             description=updated_asset.description,
-            club_id=updated_asset.club_id,
+            status=self.asset_repository.get_asset_status(updated_asset.id),
             category_id=updated_asset.category_id,
             category_name=None,  # To be filled if needed
             total_quantity=updated_asset.total_quantity,
             available_quantity=updated_asset.available_quantity,
             location=updated_asset.location,
+            created_at=updated_asset.created_at,
         )
 
     def delete_asset_for_admin(self, asset_id: int) -> None:
@@ -93,7 +90,7 @@ class AssetService:
             AssetResponse(
                 id=asset.id,
                 name=asset.name,
-                status=asset.status,
+                status=self.asset_repository.get_asset_status(asset.id),
                 description=asset.description,
                 club_id=asset.club_id,
                 category_id=asset.category_id,

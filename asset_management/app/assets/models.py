@@ -10,19 +10,13 @@ if TYPE_CHECKING:
     from asset_management.app.favorite.models import Favorite
     from asset_management.app.picture.models import Picture
 
-from enum import Enum
 from datetime import datetime
 
-class AssetStatus(Enum):
-  AVAILABLE = 0
-  CHECKED_OUT = 1
-  
 class Asset(Base):
     __tablename__ = "assets"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(50), nullable=False)
-    status: Mapped[AssetStatus] = mapped_column(Integer, nullable=False, default=AssetStatus.AVAILABLE.value)
     description: Mapped[Optional[str]] = mapped_column(String(500), nullable=True, default=None)
     total_quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     available_quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
@@ -30,12 +24,12 @@ class Asset(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=func.now())
 
     club_id: Mapped[int] = mapped_column(ForeignKey("club.id"), nullable=False)
-    category_id: Mapped[int] = mapped_column(ForeignKey("category.id"), nullable=False)
+    category_id: Mapped[Optional[int]] = mapped_column(ForeignKey("category.id"), nullable=True)
     # picture_id: Mapped[Optional[int]] = mapped_column(ForeignKey("picture.id"), nullable=True)
 
     # Relationships
     club: Mapped["Club"] = relationship(back_populates="assets")
-    category: Mapped["Category"] = relationship(back_populates="assets")
+    category: Mapped[Optional["Category"]] = relationship(back_populates="assets")
     schedules: Mapped[List["Schedule"]] = relationship(back_populates="asset")
     favorites: Mapped[List["Favorite"]] = relationship(back_populates="asset")
     # main_picture: Mapped[Optional["Picture"]] = relationship(
