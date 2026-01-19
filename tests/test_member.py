@@ -29,61 +29,52 @@ def auth_token(client, user_data):
 
 
 @pytest.fixture(scope="function")
-def test_club(client, auth_token, user_data, db_session):
-    """Create a test club and return club data (user is NOT automatically added)"""
-    create_payload = {"name": "Test Club", "description": "Test club for members"}
+def test_club(client, db_session):
+    """Create a test club via admin signup and return club data with admin info"""
+    admin_signup_payload = {
+        "name": "clubadmin",
+        "email": "clubadmin@example.com",
+        "password": "adminpass123",
+        "club_name": "Test Club",
+        "club_description": "Test club for members"
+    }
     response = client.post(
-        "/api/clubs",
-        json=create_payload,
-        headers={"Authorization": f"Bearer {auth_token}"},
+        "/api/admin/signup",
+        json=admin_signup_payload,
     )
     assert response.status_code == 201
-    return response.json()
-
-
-@pytest.fixture(scope="function")
-def admin_user_data(client, db_session):
-    """Create an admin user and return user data"""
-    test_user_data = {
-        "name": "adminuser",
-        "email": "adminuser@example.com",
-        "password": "adminpassword",
-    }
-    response = client.post("/api/users/signup", json=test_user_data)
-    assert response.status_code == 201
     data = response.json()
-    data["password"] = test_user_data["password"]
-    return data
+    return {
+        "id": data["club_id"],
+        "name": data["club_name"],
+        "admin_user_id": data["id"],
+        "admin_email": admin_signup_payload["email"],
+        "admin_password": admin_signup_payload["password"]
+    }
 
 
 @pytest.fixture(scope="function")
-def admin_token(client, admin_user_data):
-    """Get authentication token for admin user"""
+def admin_token(client, test_club):
+    """Get authentication token for club admin user"""
     response = client.post(
         "/api/auth/login",
-        json={"email": admin_user_data["email"], "password": admin_user_data["password"]},
+        json={"email": test_club["admin_email"], "password": test_club["admin_password"]},
     )
     return response.json()["tokens"]["access_token"]
 
 
 @pytest.fixture(scope="function")
-def test_club_with_admin(client, test_club, admin_token, admin_user_data, db_session):
-    """Add admin user to test club with permission=1 directly in DB"""
-    from asset_management.app.user.models import UserClublist
-    
-    Session = db_session
-    session = Session()
-    try:
-        user_club = UserClublist(
-            user_id=admin_user_data["id"],
-            club_id=test_club["id"],
-            permission=1  # Admin permission
-        )
-        session.add(user_club)
-        session.commit()
-    finally:
-        session.close()
-    
+def admin_user_data(test_club):
+    """Get admin user data from test_club"""
+    return {
+        "id": test_club["admin_user_id"],
+        "email": test_club["admin_email"],
+    }
+
+
+@pytest.fixture(scope="function")
+def test_club_with_admin(test_club):
+    """Alias for test_club (already has admin)"""
     return test_club
 
 
@@ -407,9 +398,34 @@ def test_forbidden_update_without_permission(client: TestClient, auth_token, tes
     assert response.status_code == 403
 
 
-def test_forbidden_delete_without_permission(client: TestClient, auth_token, test_club_with_admin, admin_token, user_data):
-    """Test that regular user cannot delete club members"""
-    # Admin creates a member
+def test_forbidden_delete_without_permission(client: TestClient, test_club_with_admin, admin_token, user_data, db_session):
+    """Test that regular user cannot delete other club members"""
+    # Create another user
+    another_user_data = {
+        "name": "anotheruser",
+        "email": "anotheruser@example.com",
+        "password": "anotherpassword",
+    }
+    response = client.post("/api/users/signup", json=another_user_data)
+    assert response.status_code == 201
+    another_user_id = response.json()["id"]
+    
+    # Get token for another user
+    auth_response = client.post(
+        "/api/auth/login",
+        json={"email": another_user_data["email"], "password": another_user_data["password"]},
+    )
+    another_user_token = auth_response.json()["tokens"]["access_token"]
+    
+    # Add another user to the club as regular member
+    payload_another = {"user_id": another_user_id, "club_id": test_club_with_admin["id"], "permission": 0}
+    client.post(
+        "/api/club-members",
+        json=payload_another,
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    
+    # Admin creates a member (user_data)
     payload = {"user_id": user_data["id"], "club_id": test_club_with_admin["id"], "permission": 0}
     create_response = client.post(
         "/api/club-members",
@@ -419,10 +435,10 @@ def test_forbidden_delete_without_permission(client: TestClient, auth_token, tes
     assert create_response.status_code == 201
     member_id = create_response.json()["id"]
 
-    # Regular user tries to delete
+    # Another regular user tries to delete user_data's membership
     response = client.delete(
         f"/api/club-members/{member_id}",
-        headers={"Authorization": f"Bearer {auth_token}"},
+        headers={"Authorization": f"Bearer {another_user_token}"},
     )
 
     assert response.status_code == 403
