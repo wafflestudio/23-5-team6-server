@@ -9,6 +9,7 @@ class ClubMemberBase(BaseModel):
 
 class ClubMember(ClubMemberBase):
     id: int
+    name: str
 
 
 class ClubMemberResponse(BaseModel):
