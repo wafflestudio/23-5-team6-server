@@ -6,6 +6,7 @@ from asset_management.database.common import Base
 if TYPE_CHECKING:
     from asset_management.app.user.models import UserClublist
     from asset_management.app.assets.models import Asset
+    from asset_management.app.schedule.models import Schedule
 
 
 class Club(Base):
@@ -19,3 +20,4 @@ class Club(Base):
     # Relationships
     user_clublists: Mapped[List["UserClublist"]] = relationship(back_populates="club")
     assets: Mapped[List["Asset"]] = relationship(back_populates="club")
+    schedules: Mapped[List["Schedule"]] = relationship(back_populates="club")

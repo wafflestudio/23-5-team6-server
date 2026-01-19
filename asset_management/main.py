@@ -8,6 +8,7 @@ from asset_management.app.club.application_routes import router as club_applicat
 from asset_management.app.admin.routes import router as admin_router
 from asset_management.app.assets.router import router as asset_router
 from asset_management.app.club_member.router import router as club_member_router
+from asset_management.app.schedule.router import router as schedule_router
 
 app = FastAPI(title="Asset Management API")
 
@@ -34,3 +35,4 @@ app.include_router(club_application_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")
 app.include_router(asset_router, prefix="/api")
 app.include_router(club_member_router, prefix="/api")
+app.include_router(schedule_router, prefix="/api")
