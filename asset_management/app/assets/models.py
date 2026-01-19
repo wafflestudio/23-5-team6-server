@@ -10,19 +10,13 @@ if TYPE_CHECKING:
     from asset_management.app.favorite.models import Favorite
     from asset_management.app.picture.models import Picture
 
-from enum import Enum
 from datetime import datetime
 
-class AssetStatus(Enum):
-  AVAILABLE = 0
-  CHECKED_OUT = 1
-  
 class Asset(Base):
     __tablename__ = "assets"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(50), nullable=False)
-    status: Mapped[AssetStatus] = mapped_column(Integer, nullable=False, default=AssetStatus.AVAILABLE.value)
     description: Mapped[Optional[str]] = mapped_column(String(500), nullable=True, default=None)
     total_quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     available_quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
