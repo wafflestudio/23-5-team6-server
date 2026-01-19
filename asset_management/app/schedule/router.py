@@ -27,9 +27,9 @@ def get_schedules(
   size: int = 10,
   my_id=Depends(login_with_header),
 ) -> ScheduleListResponse:
-  """대여 목록 조회
+  """대여이력 조회
 
-  일반 사용자는 자신의 대여, 관리자는 모든 사용자의 대여를 조회할 수 있습니다."""
+  일반 사용자는 자신의 대여이력, 관리자는 모든 사용자의 대여이력을 조회할 수 있습니다."""
   if schedule_service.is_admin(my_id) is False:
     user_id = my_id
   
@@ -52,7 +52,7 @@ def new_schedule(
   schedule_service: Annotated[ScheduleService, Depends()] ,
   user=Depends(login_with_header),
 ) -> ScheduleResponse:
-  """대여 추가"""
+  """대여이력 추가"""
   return schedule_service.create_schedule(club_id, request)
 
 
@@ -63,7 +63,7 @@ def update_schedule(
   schedule_service: Annotated[ScheduleService, Depends()] ,
   user=Depends(login_with_header),
 ) -> ScheduleResponse:
-  """대여 수정
+  """대여이력 수정
 
   승인/반납/취소 등의 상태 변경이 가능하며, 날짜 변경 또한 가능합니다."""
   return schedule_service.update_schedule(schedule_id, request)
@@ -75,5 +75,5 @@ def delete_schedule(
   schedule_service: Annotated[ScheduleService, Depends()] ,
   user=Depends(login_with_header),
 ) -> None:
-  """대여 삭제"""
+  """대여이력 삭제"""
   return schedule_service.delete_schedule(schedule_id, user)
