@@ -15,6 +15,7 @@ from asset_management.app.admin.schemas import (
     PendingUserDetail,
     ClubCodeUpdateRequest,
     ClubCodeUpdateResponse,
+    AdminMyClubResponse,
 )
 from asset_management.database.session import get_session
 from asset_management.app.auth.utils import hash_password
@@ -162,6 +163,45 @@ def update_club_code(
     session.refresh(club)
 
     return ClubCodeUpdateResponse(club_id=club.id, club_code=club.club_code)
+
+
+@router.get(
+    "/my-club",
+    response_model=AdminMyClubResponse,
+    summary="Get current admin's club",
+)
+def get_my_club(
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+
+    admin_club = session.query(UserClublist).filter(
+        UserClublist.user_id == current_user.id,
+        UserClublist.permission == UserPermission.ADMIN.value
+    ).first()
+    if not admin_club:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Admin club not found"
+        )
+
+    club = session.query(Club).filter(Club.id == admin_club.club_id).first()
+    if not club:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Club not found"
+        )
+
+    return AdminMyClubResponse(
+        club_id=club.id,
+        club_name=club.name,
+        club_code=club.club_code,
+    )
 
 
 @router.get(

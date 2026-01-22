@@ -54,3 +54,9 @@ class ClubCodeUpdateRequest(BaseModel):
 class ClubCodeUpdateResponse(BaseModel):
     club_id: int
     club_code: str
+
+
+class AdminMyClubResponse(BaseModel):
+    club_id: int
+    club_name: str
+    club_code: str
