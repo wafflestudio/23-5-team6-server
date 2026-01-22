@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from asset_management.app.schedule.models import Schedule
     from asset_management.app.favorite.models import Favorite
     from asset_management.app.picture.models import Picture
+    from asset_management.app.statistics.models import Statistic
 
 from datetime import datetime
 
@@ -32,6 +33,7 @@ class Asset(Base):
     category: Mapped[Optional["Category"]] = relationship(back_populates="assets")
     schedules: Mapped[List["Schedule"]] = relationship(back_populates="asset")
     favorites: Mapped[List["Favorite"]] = relationship(back_populates="asset")
+    statistics: Mapped[Optional["Statistic"]] = relationship(back_populates="asset", uselist=False)
     # main_picture: Mapped[Optional["Picture"]] = relationship(
     #     foreign_keys=[picture_id]
     # )
