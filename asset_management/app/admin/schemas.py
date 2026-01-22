@@ -10,7 +10,7 @@ class AdminSignupRequest(BaseModel):
     club_description: Optional[str] = Field(None, max_length=255, description="Club description")
     club_code: Optional[str] = Field(
         None,
-        min_length=1,
+        min_length=0,
         max_length=50,
         description="Custom club invitation code",
     )
@@ -62,12 +62,7 @@ class UserApprovalResponse(BaseModel):
 
 
 class ClubCodeUpdateRequest(BaseModel):
-    club_code: Optional[str] = Field(
-        None,
-        min_length=1,
-        max_length=50,
-        description="New club code (omit to auto-generate)",
-    )
+    club_code: str = Field(..., min_length=0, max_length=50, description="New club code")
 
 
 class ClubCodeUpdateResponse(BaseModel):
@@ -79,26 +74,3 @@ class AdminMyClubResponse(BaseModel):
     club_id: int
     club_name: str
     club_code: str
-    location_lat: Optional[int] = None
-    location_lng: Optional[int] = None
-
-
-class ClubLocationUpdateRequest(BaseModel):
-    location_lat: int = Field(
-        ...,
-        ge=-90_000_000,
-        le=90_000_000,
-        description="Club latitude (degrees * 1,000,000)",
-    )
-    location_lng: int = Field(
-        ...,
-        ge=-180_000_000,
-        le=180_000_000,
-        description="Club longitude (degrees * 1,000,000)",
-    )
-
-
-class ClubLocationUpdateResponse(BaseModel):
-    club_id: int
-    location_lat: int
-    location_lng: int

@@ -1,10 +1,12 @@
 from typing import Annotated, Optional
 import math
 from datetime import datetime, date
+import math
 from fastapi import Depends, HTTPException, status
 from asset_management.app.schedule.repositories import ScheduleRepository
 from asset_management.app.schedule.models import Schedule, Status
 from asset_management.app.assets.repositories import AssetRepository
+from asset_management.app.club.models import Club
 from asset_management.app.club.models import Club
 from asset_management.app.rental.schemas import RentalResponse
 from asset_management.database.session import get_session
@@ -87,50 +89,12 @@ class RentalService:
 
         return self._schedule_to_rental(schedule)
 
-    def _validate_return_location(
-        self,
-        club_id: int,
-        location_lat: int,
-        location_lng: int,
-    ) -> None:
-        club = self.db_session.query(Club).filter(Club.id == club_id).first()
-        if not club:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="동아리를 찾을 수 없습니다",
-            )
-
-        if club.location_lat is None or club.location_lng is None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="동아리 위치가 설정되어 있지 않습니다",
-            )
-
-        club_lat = club.location_lat / 1_000_000
-        club_lng = club.location_lng / 1_000_000
-        user_lat = location_lat / 1_000_000
-        user_lng = location_lng / 1_000_000
-
-        radius_m = 6_371_000
-        phi1 = math.radians(club_lat)
-        phi2 = math.radians(user_lat)
-        dphi = math.radians(user_lat - club_lat)
-        dlambda = math.radians(user_lng - club_lng)
-        a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
-        distance_m = 2 * radius_m * math.asin(math.sqrt(a))
-
-        if distance_m > 15:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="반납 위치가 동아리 위치 반경 15m 밖입니다",
-            )
-
     def return_item(
         self,
         rental_id: int,
         user_id: str,
-        location_lat: int,
-        location_lng: int,
+        location_lat: Optional[int] = None,
+        location_lng: Optional[int] = None,
     ) -> RentalResponse:
         """물품 반납"""
         schedule = self.db_session.query(Schedule).filter(Schedule.id == rental_id).first()
@@ -153,11 +117,34 @@ class RentalService:
                 detail="이미 반납된 물품",
             )
 
-        self._validate_return_location(
-            club_id=schedule.club_id,
-            location_lat=location_lat,
-            location_lng=location_lng,
-        )
+        club = self.db_session.query(Club).filter(Club.id == schedule.club_id).first()
+        club_lat = getattr(club, "location_lat", None) if club else None
+        club_lng = getattr(club, "location_lng", None) if club else None
+        if club_lat is not None and club_lng is not None:
+            if location_lat is None or location_lng is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="반납 위치 정보가 필요합니다",
+                )
+
+            club_lat = club_lat / 1_000_000
+            club_lng = club_lng / 1_000_000
+            user_lat = location_lat / 1_000_000
+            user_lng = location_lng / 1_000_000
+
+            radius_m = 6_371_000
+            phi1 = math.radians(club_lat)
+            phi2 = math.radians(user_lat)
+            dphi = math.radians(user_lat - club_lat)
+            dlambda = math.radians(user_lng - club_lng)
+            a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
+            distance_m = 2 * radius_m * math.asin(math.sqrt(a))
+
+            if distance_m > 15:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="반납 위치가 동아리 위치 반경 15m 밖입니다",
+                )
 
         # 반납 처리
         returned_at = datetime.now()

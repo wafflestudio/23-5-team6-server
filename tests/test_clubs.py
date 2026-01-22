@@ -108,36 +108,6 @@ def test_admin_update_club_code(client):
     assert club_response.json()["club_code"] == "UPDATED1"
 
 
-def test_admin_update_club_code_auto_generate(client):
-    admin_payload = {
-        "name": "Admin Auto Code",
-        "email": "autocode_admin@example.com",
-        "password": "strongpassword",
-        "club_name": "Auto Code Club",
-        "club_description": "Test club for auto code",
-    }
-    signup_response = client.post("/api/admin/signup", json=admin_payload)
-    assert signup_response.status_code == 201
-    admin_data = signup_response.json()
-    old_code = admin_data["club_code"]
-
-    login_response = client.post(
-        "/api/auth/login",
-        json={"email": admin_payload["email"], "password": admin_payload["password"]},
-    )
-    assert login_response.status_code == 200
-    token = login_response.json()["tokens"]["access_token"]
-
-    patch_response = client.patch(
-        "/api/admin/club-code",
-        json={},
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    assert patch_response.status_code == 200
-    new_code = patch_response.json()["club_code"]
-    assert new_code != old_code
-
-
 def test_admin_get_my_club(client):
     admin_payload = {
         "name": "Admin My Club",
@@ -145,8 +115,6 @@ def test_admin_get_my_club(client):
         "password": "strongpassword",
         "club_name": "My Club",
         "club_description": "Test club for my-club endpoint",
-        "location_lat": 37_566_500,
-        "location_lng": 126_978_000,
     }
     signup_response = client.post("/api/admin/signup", json=admin_payload)
     assert signup_response.status_code == 201
@@ -168,34 +136,3 @@ def test_admin_get_my_club(client):
     assert my_club_data["club_id"] == admin_data["club_id"]
     assert my_club_data["club_name"] == admin_data["club_name"]
     assert my_club_data["club_code"] == admin_data["club_code"]
-    assert my_club_data["location_lat"] == admin_payload["location_lat"]
-    assert my_club_data["location_lng"] == admin_payload["location_lng"]
-
-
-def test_admin_update_club_location(client):
-    admin_payload = {
-        "name": "Admin Location",
-        "email": "location_admin@example.com",
-        "password": "strongpassword",
-        "club_name": "Location Club",
-        "club_description": "Test club for location update",
-    }
-    signup_response = client.post("/api/admin/signup", json=admin_payload)
-    assert signup_response.status_code == 201
-
-    login_response = client.post(
-        "/api/auth/login",
-        json={"email": admin_payload["email"], "password": admin_payload["password"]},
-    )
-    assert login_response.status_code == 200
-    token = login_response.json()["tokens"]["access_token"]
-
-    patch_response = client.patch(
-        "/api/admin/club-location",
-        json={"location_lat": 37_565_000, "location_lng": 126_977_000},
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    assert patch_response.status_code == 200
-    patch_data = patch_response.json()
-    assert patch_data["location_lat"] == 37_565_000
-    assert patch_data["location_lng"] == 126_977_000

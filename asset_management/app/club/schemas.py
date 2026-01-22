@@ -22,12 +22,14 @@ class ClubResponse(ClubBase):
     club_code: str
     location_lat: Optional[int] = None
     location_lng: Optional[int] = None
+    location_lat: Optional[int] = None
+    location_lng: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class ClubApplicationRequest(BaseModel):
-    club_code: str = Field(..., min_length=1, description="Club invitation code")
+    club_code: str = Field(..., min_length=0, description="Club invitation code")
 
 
 class ClubApplicationResponse(BaseModel):
