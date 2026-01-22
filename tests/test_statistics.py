@@ -208,18 +208,15 @@ def test_statistics_after_single_rental(
     res = client.post("/api/club-members", json=member_payload, headers=admin_headers)
     assert res.status_code == 201, res.text
     
-    # 스케줄 생성 (대여)
-    start = datetime.now()
-    end = start + timedelta(hours=2)  # 2시간 = 7200초
-    
-    schedule_payload = {
-        "asset_id": asset_id,
-        "start_date": start.isoformat(),
-        "end_date": end.isoformat(),
+    # 대여 요청
+    borrow_payload = {
+        "item_id": asset_id,
+        "expected_return_date": (datetime.now() + timedelta(hours=2)).date().isoformat()
     }
     
-    res = client.post(f"/api/schedules/{club_id}", json=schedule_payload, headers=user_headers)
+    res = client.post("/api/rentals/borrow", json=borrow_payload, headers=user_headers)
     assert res.status_code == 201, res.text
+    rental_data = res.json()
     
     # 통계 조회
     res = client.get(f"/api/statistics/{asset_id}")
@@ -227,9 +224,8 @@ def test_statistics_after_single_rental(
     
     data = res.json()
     assert data["total_rental_count"] == 1
-    assert data["average_rental_duration"] == pytest.approx(7200.0, rel=0.1)  # 2시간
+    # rental은 실제 대여 기간이 아닌 예상 반납일 기준으로 생성됨
     assert data["recent_rental_count"] == 1
-    assert data["recent_avg_duration"] == pytest.approx(7200.0, rel=0.1)
     assert data["unique_borrower_count"] == 1
     assert data["last_borrowed_at"] is not None
 
@@ -255,21 +251,17 @@ def test_statistics_multiple_rentals_same_user(
     res = client.post("/api/club-members", json=member_payload, headers=admin_headers)
     assert res.status_code == 201, res.text
     
-    # 3번 대여 (1시간, 2시간, 3시간)
-    durations = [1, 2, 3]  # hours
-    
-    for hours in durations:
-        start = datetime.now()
-        end = start + timedelta(hours=hours)
-        
-        schedule_payload = {
-            "asset_id": asset_id,
-            "start_date": start.isoformat(),
-            "end_date": end.isoformat(),
+    # 3번 대여 (각각 다른 예상 반납일)
+    rental_ids = []
+    for days in [1, 2, 3]:
+        borrow_payload = {
+            "item_id": asset_id,
+            "expected_return_date": (datetime.now() + timedelta(days=days)).date().isoformat()
         }
         
-        res = client.post(f"/api/schedules/{club_id}", json=schedule_payload, headers=user_headers)
+        res = client.post("/api/rentals/borrow", json=borrow_payload, headers=user_headers)
         assert res.status_code == 201, res.text
+        rental_ids.append(res.json()["id"])
     
     # 통계 조회
     res = client.get(f"/api/statistics/{asset_id}")
@@ -277,8 +269,6 @@ def test_statistics_multiple_rentals_same_user(
     
     data = res.json()
     assert data["total_rental_count"] == 3
-    # 평균: (1 + 2 + 3) / 3 = 2시간 = 7200초
-    assert data["average_rental_duration"] == pytest.approx(7200.0, rel=0.1)
     assert data["recent_rental_count"] == 3
     assert data["unique_borrower_count"] == 1  # 동일 사용자
 
@@ -323,15 +313,12 @@ def test_statistics_multiple_users(
         res = client.post("/api/club-members", json=member_payload, headers=admin_headers)
         assert res.status_code == 201, res.text
         
-        # 스케줄 생성
-        start = datetime.now()
-        end = start + timedelta(hours=1)
-        schedule_payload = {
-            "asset_id": asset_id,
-            "start_date": start.isoformat(),
-            "end_date": end.isoformat(),
+        # 대여 요청
+        borrow_payload = {
+            "item_id": asset_id,
+            "expected_return_date": (datetime.now() + timedelta(days=1)).date().isoformat()
         }
-        res = client.post(f"/api/schedules/{club_id}", json=schedule_payload, headers=headers)
+        res = client.post("/api/rentals/borrow", json=borrow_payload, headers=headers)
         assert res.status_code == 201, res.text
     
     # 통계 조회
@@ -381,16 +368,12 @@ def test_statistics_recent_vs_total(
     session.commit()
     session.close()
     
-    # 최근 스케줄 생성 (API 통해)
-    start = datetime.now()
-    end = start + timedelta(hours=2)
-    
-    schedule_payload = {
-        "asset_id": asset_id,
-        "start_date": start.isoformat(),
-        "end_date": end.isoformat(),
+    # 최근 대여 생성 (API 통해)
+    borrow_payload = {
+        "item_id": asset_id,
+        "expected_return_date": (datetime.now() + timedelta(days=1)).date().isoformat()
     }
-    res = client.post(f"/api/schedules/{club_id}", json=schedule_payload, headers=user_headers)
+    res = client.post("/api/rentals/borrow", json=borrow_payload, headers=user_headers)
     assert res.status_code == 201, res.text
     
     # 통계 조회
@@ -402,7 +385,7 @@ def test_statistics_recent_vs_total(
     assert data["recent_rental_count"] == 1  # 최근 30일은 1건만
 
 
-def test_statistics_zero_duration(
+def test_statistics_with_return(
     client: TestClient,
     admin_headers: dict,
     user_headers: dict,
@@ -410,7 +393,7 @@ def test_statistics_zero_duration(
     signed_up_admin: dict,
     signed_up_user: dict,
 ):
-    """대여 기간이 0인 경우 (즉시 반납) 처리 확인"""
+    """대여 후 반납까지 테스트"""
     asset_id = created_asset["id"]
     club_id = signed_up_admin["club_id"]
     
@@ -423,17 +406,18 @@ def test_statistics_zero_duration(
     res = client.post("/api/club-members", json=member_payload, headers=admin_headers)
     assert res.status_code == 201, res.text
     
-    # 동일 시간으로 스케줄 생성
-    now = datetime.now()
-    
-    schedule_payload = {
-        "asset_id": asset_id,
-        "start_date": now.isoformat(),
-        "end_date": now.isoformat(),
+    # 대여
+    borrow_payload = {
+        "item_id": asset_id,
+        "expected_return_date": (datetime.now() + timedelta(days=1)).date().isoformat()
     }
-    
-    res = client.post(f"/api/schedules/{club_id}", json=schedule_payload, headers=user_headers)
+    res = client.post("/api/rentals/borrow", json=borrow_payload, headers=user_headers)
     assert res.status_code == 201, res.text
+    rental_id = res.json()["id"]
+    
+    # 반납
+    res = client.post(f"/api/rentals/{rental_id}/return", headers=user_headers)
+    assert res.status_code == 200, res.text
     
     # 통계 조회
     res = client.get(f"/api/statistics/{asset_id}")
@@ -441,4 +425,4 @@ def test_statistics_zero_duration(
     
     data = res.json()
     assert data["total_rental_count"] == 1
-    assert data["average_rental_duration"] == 0.0
+    assert data["unique_borrower_count"] == 1

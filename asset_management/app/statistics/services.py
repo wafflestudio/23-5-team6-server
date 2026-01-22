@@ -45,7 +45,7 @@ class StatisticsService:
       else (sum([(sch.end_date - sch.start_date).total_seconds() for sch in recent_rentals]) / recent_rental_count)
     )
 
-    unique_borrower_count = len(set([sch.borrower_id for sch in schedules]))
+    unique_borrower_count = len(set([sch.user_id for sch in schedules]))
 
     last_borrowed_at = None if total_rental_count == 0 else max([sch.start_date for sch in schedules])
     last_updated_at = datetime.now()
