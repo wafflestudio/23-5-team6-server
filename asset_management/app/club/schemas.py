@@ -20,6 +20,8 @@ class ClubUpdate(BaseModel):
 class ClubResponse(ClubBase):
     id: int
     club_code: str
+    location_lat: Optional[int] = None
+    location_lng: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
 
