@@ -43,7 +43,7 @@ jobs:
         env:
           # MySQL 연결 정보
           DB_DIALECT: mysql
-          DB_DRIVER: aiomysql
+          DB_DRIVER: pymysql
           DB_HOST: "127.0.0.1"
           DB_PORT: "3306"
           DB_USER: "root"
@@ -72,7 +72,7 @@ jobs:
         env:
           # MySQL 연결 정보
           DB_DIALECT: mysql
-          DB_DRIVER: aiomysql
+          DB_DRIVER: pymysql
           DB_HOST: "127.0.0.1"
           DB_PORT: "3306"
           DB_USER: "root"
@@ -120,7 +120,7 @@ jobs:
         env:
           # 테스트용 더미 값 (실제 DB 연결 없이 import만 검증)
           DB_DIALECT: mysql
-          DB_DRIVER: aiomysql
+          DB_DRIVER: pymysql
           DB_HOST: "127.0.0.1"
           DB_PORT: "3306"
           DB_USER: "test_user"
