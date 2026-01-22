@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends
 from asset_management.app.statistics.schemas import AssetStatistics
 from asset_management.app.statistics.services import StatisticsService
 
-router = APIRouter(prefix="/statistics")
+router = APIRouter(prefix="/statistics", tags=["statistics"])
 
 
 @router.get("/{asset_id}")
