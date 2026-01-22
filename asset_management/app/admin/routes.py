@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Body
 from typing import Annotated
 from sqlalchemy.orm import Session
 import secrets
@@ -77,6 +77,8 @@ def admin_signup(payload: AdminSignupRequest, session: Session = Depends(get_ses
         name=payload.club_name,
         description=payload.club_description,
         club_code=club_code,
+        location_lat=payload.location_lat,
+        location_lng=payload.location_lng,
     )
     session.add(club)
     session.flush()  # Get club.id without committing
@@ -111,6 +113,8 @@ def admin_signup(payload: AdminSignupRequest, session: Session = Depends(get_ses
         club_id=club.id,
         club_name=club.name,
         club_code=club.club_code,
+        location_lat=club.location_lat,
+        location_lng=club.location_lng,
     )
 
 
@@ -120,7 +124,7 @@ def admin_signup(payload: AdminSignupRequest, session: Session = Depends(get_ses
     summary="Update club code for admin's club",
 )
 def update_club_code(
-    payload: ClubCodeUpdateRequest,
+    payload: ClubCodeUpdateRequest = Body(default_factory=ClubCodeUpdateRequest),
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
@@ -148,17 +152,24 @@ def update_club_code(
             detail="Club not found"
         )
 
-    existing = session.query(Club).filter(
-        Club.club_code == payload.club_code,
-        Club.id != club.id
-    ).first()
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Club code already exists"
-        )
-
-    club.club_code = payload.club_code
+    if payload.club_code:
+        existing = session.query(Club).filter(
+            Club.club_code == payload.club_code,
+            Club.id != club.id
+        ).first()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Club code already exists"
+            )
+        club.club_code = payload.club_code
+    else:
+        while True:
+            club_code = generate_club_code()
+            existing = session.query(Club).filter(Club.club_code == club_code).first()
+            if not existing:
+                break
+        club.club_code = club_code
     session.commit()
     session.refresh(club)
 

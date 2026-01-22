@@ -1,13 +1,17 @@
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Body, Depends, status
 from fastapi import Depends as FastAPIDepends
 
 from asset_management.app.assets.repositories import AssetRepository
 from asset_management.app.auth.utils import login_with_header
 from asset_management.app.club_member.services import ClubMemberService
-from asset_management.app.rental.schemas import RentalBorrowRequest, RentalResponse
+from asset_management.app.rental.schemas import (
+    RentalBorrowRequest,
+    RentalReturnRequest,
+    RentalResponse,
+)
 from asset_management.app.rental.services import RentalService
 from asset_management.database.session import get_session
 
@@ -32,9 +36,17 @@ def return_item(
     rental_id: int,
     rental_service: Annotated[RentalService, Depends()],
     user_id: str = Depends(login_with_header),
+    request: Optional[RentalReturnRequest] = Body(default=None),
 ) -> RentalResponse:
     """물품 반납
     
     대여한 물품을 반납합니다.
     """
-    return rental_service.return_item(rental_id=rental_id, user_id=user_id)
+    location_lat = request.location_lat if request else None
+    location_lng = request.location_lng if request else None
+    return rental_service.return_item(
+        rental_id=rental_id,
+        user_id=user_id,
+        location_lat=location_lat,
+        location_lng=location_lng,
+    )
