@@ -12,7 +12,9 @@ from asset_management.app.admin.schemas import (
     UserApprovalRequest,
     UserApprovalResponse,
     PendingUsersResponse,
-    PendingUserDetail
+    PendingUserDetail,
+    ClubCodeUpdateRequest,
+    ClubCodeUpdateResponse,
 )
 from asset_management.database.session import get_session
 from asset_management.app.auth.utils import hash_password
@@ -53,12 +55,21 @@ def admin_signup(payload: AdminSignupRequest, session: Session = Depends(get_ses
             detail="Club name already exists"
         )
     
-    # Generate unique club code
-    while True:
-        club_code = generate_club_code()
-        existing = session.query(Club).filter(Club.club_code == club_code).first()
-        if not existing:
-            break
+    # Generate or validate unique club code
+    if payload.club_code:
+        existing = session.query(Club).filter(Club.club_code == payload.club_code).first()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Club code already exists"
+            )
+        club_code = payload.club_code
+    else:
+        while True:
+            club_code = generate_club_code()
+            existing = session.query(Club).filter(Club.club_code == club_code).first()
+            if not existing:
+                break
     
     # Create club
     club = Club(
@@ -100,6 +111,57 @@ def admin_signup(payload: AdminSignupRequest, session: Session = Depends(get_ses
         club_name=club.name,
         club_code=club.club_code,
     )
+
+
+@router.patch(
+    "/club-code",
+    response_model=ClubCodeUpdateResponse,
+    summary="Update club code for admin's club",
+)
+def update_club_code(
+    payload: ClubCodeUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+
+    admin_club = session.query(UserClublist).filter(
+        UserClublist.user_id == current_user.id,
+        UserClublist.permission == UserPermission.ADMIN.value
+    ).first()
+
+    if not admin_club:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Admin club not found"
+        )
+
+    club = session.query(Club).filter(Club.id == admin_club.club_id).first()
+    if not club:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Club not found"
+        )
+
+    existing = session.query(Club).filter(
+        Club.club_code == payload.club_code,
+        Club.id != club.id
+    ).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Club code already exists"
+        )
+
+    club.club_code = payload.club_code
+    session.commit()
+    session.refresh(club)
+
+    return ClubCodeUpdateResponse(club_id=club.id, club_code=club.club_code)
 
 
 @router.get(
