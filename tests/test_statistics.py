@@ -34,6 +34,8 @@ def admin_signup_payload() -> dict:
         "password": "adminpassword123",
         "club_name": "통계테스트동아리",
         "club_description": "통계 테스트용 동아리 설명",
+        "location_lat": 37_500_000,  # 37.5도
+        "location_lng": 127_000_000,  # 127.0도
     }
 
 
@@ -416,7 +418,11 @@ def test_statistics_with_return(
     rental_id = res.json()["id"]
     
     # 반납
-    res = client.post(f"/api/rentals/{rental_id}/return", headers=user_headers)
+    return_payload = {
+        "location_lat": 37_500_000,  # 37.5도
+        "location_lng": 127_000_000  # 127.0도
+    }
+    res = client.post(f"/api/rentals/{rental_id}/return", json=return_payload, headers=user_headers)
     assert res.status_code == 200, res.text
     
     # 통계 조회
