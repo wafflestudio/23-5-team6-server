@@ -3,6 +3,10 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
+class ImportResponse(BaseModel):
+    imported: int
+    failed: list[dict]
+
 class AssetResponse(BaseModel):
     id: int
     name: str
