@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Body
 from typing import Annotated
 from sqlalchemy.orm import Session
 import secrets
@@ -126,7 +126,7 @@ def admin_signup(payload: AdminSignupRequest, session: Session = Depends(get_ses
     summary="Update club code for admin's club",
 )
 def update_club_code(
-    payload: ClubCodeUpdateRequest,
+    payload: ClubCodeUpdateRequest = Body(default_factory=ClubCodeUpdateRequest),
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
