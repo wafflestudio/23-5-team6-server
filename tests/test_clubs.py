@@ -106,3 +106,33 @@ def test_admin_update_club_code(client):
     club_response = client.get(f"/api/clubs/{club_id}")
     assert club_response.status_code == 200
     assert club_response.json()["club_code"] == "UPDATED1"
+
+
+def test_admin_get_my_club(client):
+    admin_payload = {
+        "name": "Admin My Club",
+        "email": "myclub_admin@example.com",
+        "password": "strongpassword",
+        "club_name": "My Club",
+        "club_description": "Test club for my-club endpoint",
+    }
+    signup_response = client.post("/api/admin/signup", json=admin_payload)
+    assert signup_response.status_code == 201
+    admin_data = signup_response.json()
+
+    login_response = client.post(
+        "/api/auth/login",
+        json={"email": admin_payload["email"], "password": admin_payload["password"]},
+    )
+    assert login_response.status_code == 200
+    token = login_response.json()["tokens"]["access_token"]
+
+    my_club_response = client.get(
+        "/api/admin/my-club",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert my_club_response.status_code == 200
+    my_club_data = my_club_response.json()
+    assert my_club_data["club_id"] == admin_data["club_id"]
+    assert my_club_data["club_name"] == admin_data["club_name"]
+    assert my_club_data["club_code"] == admin_data["club_code"]
