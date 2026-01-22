@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Annotated
 from fastapi import Depends
 from sqlalchemy.orm import Session
@@ -18,6 +18,8 @@ class StatisticsService:
     statistics = self.statistics_repository.get(asset_id)
     if statistics is None:
       self.statistics_repository.create(asset_id)
+      statistics = self.update_statistics_for_asset(asset_id)
+    if statistics.last_updated_at > datetime.now() + timedelta(days=3):
       statistics = self.update_statistics_for_asset(asset_id)
 
     return AssetStatistics.model_validate(statistics)
