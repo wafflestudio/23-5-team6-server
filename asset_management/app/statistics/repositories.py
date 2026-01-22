@@ -2,7 +2,7 @@ from typing import Annotated
 from fastapi import Depends
 from sqlalchemy.orm import Session
 from asset_management.database.session import get_session
-from asset_management.app.statistics.model import Statistic
+from asset_management.app.statistics.models import Statistic
 
 class StatisticsRepository:
     def __init__(self, db_session: Session):

@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from asset_management.app.schedule.models import Schedule
     from asset_management.app.favorite.models import Favorite
     from asset_management.app.picture.models import Picture
-    from asset_management.app.statistics.model import Statistic
+    from asset_management.app.statistics.models import Statistic
 
 from datetime import datetime
 
