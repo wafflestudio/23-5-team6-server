@@ -44,7 +44,6 @@ class RentalService:
         self,
         user_id: str,
         item_id: int,
-        club_id: int,
         expected_return_date: Optional[date] = None,
     ) -> RentalResponse:
         """물품 대여"""
@@ -72,7 +71,7 @@ class RentalService:
             end_date=end_date,
             asset_id=item_id,
             user_id=user_id,
-            club_id=club_id,
+            club_id=asset.club_id,  # asset에서 club_id 가져오기
             status=Status.IN_USE.value,  # 대여 중
         )
         
