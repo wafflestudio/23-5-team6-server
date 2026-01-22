@@ -12,11 +12,6 @@ from asset_management.app.rental.schemas import (
     RentalReturnRequest,
     RentalResponse,
 )
-from asset_management.app.rental.schemas import (
-    RentalBorrowRequest,
-    RentalReturnRequest,
-    RentalResponse,
-)
 from asset_management.app.rental.services import RentalService
 from asset_management.database.session import get_session
 
