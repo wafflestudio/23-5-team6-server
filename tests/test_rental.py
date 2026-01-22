@@ -28,11 +28,52 @@ def admin_club(client, db_session):
 
 
 @pytest.fixture(scope="function")
+def admin_club_with_location(client):
+    """Create a club with location via admin signup"""
+    admin_signup_payload = {
+        "name": "rentaladmin_location",
+        "email": "rentaladmin_location@example.com",
+        "password": "adminpass123",
+        "club_name": "Rental Location Club",
+        "club_description": "Test club for rentals with location",
+        "location_lat": 37_566_500,
+        "location_lng": 126_978_000,
+    }
+    response = client.post(
+        "/api/admin/signup",
+        json=admin_signup_payload,
+    )
+    assert response.status_code == 201
+    data = response.json()
+    return {
+        "club_id": data["club_id"],
+        "admin_user_id": data["id"],
+        "admin_email": admin_signup_payload["email"],
+        "admin_password": admin_signup_payload["password"],
+        "location_lat": admin_signup_payload["location_lat"],
+        "location_lng": admin_signup_payload["location_lng"],
+    }
+
+
+@pytest.fixture(scope="function")
 def admin_token(client, admin_club):
     """Get authentication token for admin"""
     response = client.post(
         "/api/auth/login",
         json={"email": admin_club["admin_email"], "password": admin_club["admin_password"]},
+    )
+    return response.json()["tokens"]["access_token"]
+
+
+@pytest.fixture(scope="function")
+def admin_token_with_location(client, admin_club_with_location):
+    """Get authentication token for admin with club location"""
+    response = client.post(
+        "/api/auth/login",
+        json={
+            "email": admin_club_with_location["admin_email"],
+            "password": admin_club_with_location["admin_password"],
+        },
     )
     return response.json()["tokens"]["access_token"]
 
@@ -53,11 +94,36 @@ def test_user(client, db_session):
 
 
 @pytest.fixture(scope="function")
+def test_user_location(client):
+    """Create a test user for location club"""
+    test_user_data = {
+        "name": "rentaluser_location",
+        "email": "rentaluser_location@example.com",
+        "password": "userpass123",
+    }
+    response = client.post("/api/users/signup", json=test_user_data)
+    assert response.status_code == 201
+    data = response.json()
+    data["password"] = test_user_data["password"]
+    return data
+
+
+@pytest.fixture(scope="function")
 def user_token(client, test_user):
     """Get authentication token for test user"""
     response = client.post(
         "/api/auth/login",
         json={"email": test_user["email"], "password": test_user["password"]},
+    )
+    return response.json()["tokens"]["access_token"]
+
+
+@pytest.fixture(scope="function")
+def user_token_location(client, test_user_location):
+    """Get authentication token for location test user"""
+    response = client.post(
+        "/api/auth/login",
+        json={"email": test_user_location["email"], "password": test_user_location["password"]},
     )
     return response.json()["tokens"]["access_token"]
 
@@ -83,6 +149,26 @@ def test_asset(client, admin_token, admin_club):
 
 
 @pytest.fixture(scope="function")
+def test_asset_with_location(client, admin_token_with_location, admin_club_with_location):
+    """Create a test asset for location club"""
+    asset_payload = {
+        "name": "Test Camera Location",
+        "description": "Canon EOS R5",
+        "category_id": None,
+        "quantity": 3,
+        "location": "Storage Room A",
+        "club_id": admin_club_with_location["club_id"],
+    }
+    response = client.post(
+        "/api/admin/assets",
+        json=asset_payload,
+        headers={"Authorization": f"Bearer {admin_token_with_location}"},
+    )
+    assert response.status_code == 201, f"Failed to create asset: {response.text}"
+    return response.json()
+
+
+@pytest.fixture(scope="function")
 def user_in_club(client, admin_token, test_user, admin_club):
     """Add test user to the club"""
     payload = {
@@ -97,6 +183,28 @@ def user_in_club(client, admin_token, test_user, admin_club):
     )
     assert response.status_code == 201
     return test_user
+
+
+@pytest.fixture(scope="function")
+def user_in_club_with_location(
+    client,
+    admin_token_with_location,
+    test_user_location,
+    admin_club_with_location,
+):
+    """Add location test user to the location club"""
+    payload = {
+        "user_id": test_user_location["id"],
+        "club_id": admin_club_with_location["club_id"],
+        "permission": 0,
+    }
+    response = client.post(
+        "/api/club-members",
+        json=payload,
+        headers={"Authorization": f"Bearer {admin_token_with_location}"},
+    )
+    assert response.status_code == 201
+    return test_user_location
 
 
 def test_borrow_item_success(client, user_token, test_asset, user_in_club):
@@ -224,6 +332,60 @@ def test_return_item_success(client, user_token, test_asset, user_in_club):
     assert data["id"] == rental_id
     assert data["status"] == "returned"
     assert data["returned_at"] is not None
+
+
+def test_return_requires_location_when_club_has_location(
+    client,
+    user_token_location,
+    test_asset_with_location,
+    user_in_club_with_location,
+):
+    borrow_payload = {
+        "item_id": test_asset_with_location["id"]
+    }
+    borrow_response = client.post(
+        "/api/rentals/borrow",
+        json=borrow_payload,
+        headers={"Authorization": f"Bearer {user_token_location}"},
+    )
+    assert borrow_response.status_code == 201
+    rental_id = borrow_response.json()["id"]
+
+    response = client.post(
+        f"/api/rentals/{rental_id}/return",
+        headers={"Authorization": f"Bearer {user_token_location}"},
+    )
+    assert response.status_code == 400
+    assert "반납 위치 정보가 필요합니다" in response.json()["detail"]
+
+
+def test_return_with_location_within_radius_success(
+    client,
+    user_token_location,
+    test_asset_with_location,
+    user_in_club_with_location,
+    admin_club_with_location,
+):
+    borrow_payload = {
+        "item_id": test_asset_with_location["id"]
+    }
+    borrow_response = client.post(
+        "/api/rentals/borrow",
+        json=borrow_payload,
+        headers={"Authorization": f"Bearer {user_token_location}"},
+    )
+    assert borrow_response.status_code == 201
+    rental_id = borrow_response.json()["id"]
+
+    response = client.post(
+        f"/api/rentals/{rental_id}/return",
+        json={
+            "location_lat": admin_club_with_location["location_lat"],
+            "location_lng": admin_club_with_location["location_lng"],
+        },
+        headers={"Authorization": f"Bearer {user_token_location}"},
+    )
+    assert response.status_code == 200
 
 
 def test_return_nonexistent_rental(client, user_token):

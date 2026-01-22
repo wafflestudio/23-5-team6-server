@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from datetime import datetime, date
 from typing import Optional
 
@@ -20,3 +20,19 @@ class RentalResponse(BaseModel):
     borrowed_at: datetime
     expected_return_date: Optional[date] = None
     returned_at: Optional[datetime] = None
+
+
+class RentalReturnRequest(BaseModel):
+    """물품 반납 요청 (GPS 선택)"""
+    location_lat: Optional[int] = Field(
+        None,
+        ge=-90_000_000,
+        le=90_000_000,
+        description="Return latitude (degrees * 1,000,000)",
+    )
+    location_lng: Optional[int] = Field(
+        None,
+        ge=-180_000_000,
+        le=180_000_000,
+        description="Return longitude (degrees * 1,000,000)",
+    )

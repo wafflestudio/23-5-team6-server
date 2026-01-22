@@ -25,7 +25,7 @@ class ClubResponse(ClubBase):
 
 
 class ClubApplicationRequest(BaseModel):
-    club_code: str = Field(..., min_length=1, description="Club invitation code")
+    club_code: str = Field(..., min_length=0, description="Club invitation code")
 
 
 class ClubApplicationResponse(BaseModel):
