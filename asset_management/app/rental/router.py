@@ -7,7 +7,11 @@ from fastapi import Depends as FastAPIDepends
 from asset_management.app.assets.repositories import AssetRepository
 from asset_management.app.auth.utils import login_with_header
 from asset_management.app.club_member.services import ClubMemberService
-from asset_management.app.rental.schemas import RentalBorrowRequest, RentalResponse
+from asset_management.app.rental.schemas import (
+    RentalBorrowRequest,
+    RentalReturnRequest,
+    RentalResponse,
+)
 from asset_management.app.rental.services import RentalService
 from asset_management.database.session import get_session
 
@@ -30,6 +34,7 @@ def borrow_item(
 @router.post("/{rental_id}/return", status_code=status.HTTP_200_OK)
 def return_item(
     rental_id: int,
+    request: RentalReturnRequest,
     rental_service: Annotated[RentalService, Depends()],
     user_id: str = Depends(login_with_header),
 ) -> RentalResponse:
@@ -37,4 +42,9 @@ def return_item(
     
     대여한 물품을 반납합니다.
     """
-    return rental_service.return_item(rental_id=rental_id, user_id=user_id)
+    return rental_service.return_item(
+        rental_id=rental_id,
+        user_id=user_id,
+        location_lat=request.location_lat,
+        location_lng=request.location_lng,
+    )
