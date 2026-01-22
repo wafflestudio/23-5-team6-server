@@ -16,6 +16,8 @@ class Club(Base):
     name: Mapped[str] = mapped_column(String(30), nullable=False)
     description: Mapped[str | None] = mapped_column(String(255), nullable=True)
     club_code: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
+    location_lat: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    location_lng: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     # Relationships
     user_clublists: Mapped[List["UserClublist"]] = relationship(back_populates="club")

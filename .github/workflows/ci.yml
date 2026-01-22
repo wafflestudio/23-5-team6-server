@@ -9,6 +9,21 @@ on:
 jobs:
   alembic-check:
     runs-on: ubuntu-latest
+    
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: test_password
+          MYSQL_DATABASE: test_db
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    
     steps:
       - uses: actions/checkout@v4
         with:
@@ -26,14 +41,14 @@ jobs:
       
       - name: Check for multiple heads
         env:
-          # Alembic이 env.py에서 DB_SETTINGS를 import하므로 필요
-          DB_DIALECT: sqlite
-          DB_DRIVER: pysqlite
-          DB_HOST: ""
-          DB_PORT: "0"
-          DB_USER: ""
-          DB_PASSWORD: ""
-          DB_DATABASE: ":memory:"
+          # MySQL 연결 정보
+          DB_DIALECT: mysql
+          DB_DRIVER: pymysql
+          DB_HOST: "127.0.0.1"
+          DB_PORT: "3306"
+          DB_USER: "root"
+          DB_PASSWORD: "test_password"
+          DB_DATABASE: "test_db"
           ACCESS_TOKEN_SECRET: "test-secret-for-ci"
           REFRESH_TOKEN_SECRET: "test-secret-for-ci"
         run: |
@@ -55,26 +70,36 @@ jobs:
       
       - name: Verify migration chain
         env:
-          # Alembic 명령어에도 환경변수 필요
-          DB_DIALECT: sqlite
-          DB_DRIVER: pysqlite
-          DB_HOST: ""
-          DB_PORT: "0"
-          DB_USER: ""
-          DB_PASSWORD: ""
-          DB_DATABASE: ":memory:"
+          # MySQL 연결 정보
+          DB_DIALECT: mysql
+          DB_DRIVER: pymysql
+          DB_HOST: "127.0.0.1"
+          DB_PORT: "3306"
+          DB_USER: "root"
+          DB_PASSWORD: "test_password"
+          DB_DATABASE: "test_db"
           ACCESS_TOKEN_SECRET: "test-secret-for-ci"
           REFRESH_TOKEN_SECRET: "test-secret-for-ci"
         run: |
           echo "🔗 마이그레이션 체인 검증..."
           alembic history --verbose
           
-          # 마이그레이션 upgrade dry-run (offline 모드)
+          # MySQL로 실제 마이그레이션 실행하여 검증
           echo "📝 마이그레이션 검증 중..."
-          alembic upgrade head --sql > /dev/null 2>&1 || {
-            echo "::error::마이그레이션 체인에 문제가 있습니다!"
+          
+          if ! alembic upgrade head 2>&1 | tee /tmp/migration.log; then
+            echo "::error::마이그레이션 실행 중 오류 발생!"
+            cat /tmp/migration.log
             exit 1
-          }
+          fi
+          
+          # Python 에러나 Traceback이 있는지 확인
+          if grep -E "Traceback|Error:|Exception:" /tmp/migration.log | grep -v "INFO"; then
+            echo "::error::마이그레이션에 Python 오류가 있습니다!"
+            cat /tmp/migration.log
+            exit 1
+          fi
+          
           echo "✅ 마이그레이션 체인 정상"
 
   import-check:
@@ -94,13 +119,13 @@ jobs:
       - name: 모든 모듈 Import 검증
         env:
           # 테스트용 더미 값 (실제 DB 연결 없이 import만 검증)
-          DB_DIALECT: sqlite
-          DB_DRIVER: pysqlite
-          DB_HOST: ""
-          DB_PORT: "0"
-          DB_USER: ""
-          DB_PASSWORD: ""
-          DB_DATABASE: ":memory:"
+          DB_DIALECT: mysql
+          DB_DRIVER: pymysql
+          DB_HOST: "127.0.0.1"
+          DB_PORT: "3306"
+          DB_USER: "test_user"
+          DB_PASSWORD: "test_password"
+          DB_DATABASE: "test_db"
           ACCESS_TOKEN_SECRET: "test-secret-for-ci"
           REFRESH_TOKEN_SECRET: "test-secret-for-ci"
         run: |

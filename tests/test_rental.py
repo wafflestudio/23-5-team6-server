@@ -23,7 +23,9 @@ def admin_club(client, db_session):
         "club_id": data["club_id"],
         "admin_user_id": data["id"],
         "admin_email": admin_signup_payload["email"],
-        "admin_password": admin_signup_payload["password"]
+        "admin_password": admin_signup_payload["password"],
+        "location_lat": admin_signup_payload["location_lat"],
+        "location_lng": admin_signup_payload["location_lng"],
     }
 
 
@@ -307,7 +309,7 @@ def test_borrow_without_auth(client, test_asset):
     assert response.status_code == 401
 
 
-def test_return_item_success(client, user_token, test_asset, user_in_club):
+def test_return_item_success(client, user_token, test_asset, user_in_club, return_payload):
     """Test successful item return"""
     # First borrow the item
     borrow_payload = {
@@ -324,6 +326,7 @@ def test_return_item_success(client, user_token, test_asset, user_in_club):
     # Then return it
     response = client.post(
         f"/api/rentals/{rental_id}/return",
+        json=return_payload,
         headers={"Authorization": f"Bearer {user_token}"},
     )
     
@@ -392,6 +395,7 @@ def test_return_nonexistent_rental(client, user_token):
     """Test returning non-existent rental"""
     response = client.post(
         "/api/rentals/99999/return",
+        json=return_payload,
         headers={"Authorization": f"Bearer {user_token}"},
     )
     
@@ -399,10 +403,11 @@ def test_return_nonexistent_rental(client, user_token):
     assert "존재하지 않는 대여 기록" in response.json()["detail"]
 
 
-def test_return_invalid_rental_id(client, user_token):
+def test_return_invalid_rental_id(client, user_token, return_payload):
     """Test returning with invalid rental ID format"""
     response = client.post(
         "/api/rentals/invalid-id/return",
+        json=return_payload,
         headers={"Authorization": f"Bearer {user_token}"},
     )
     
@@ -410,7 +415,9 @@ def test_return_invalid_rental_id(client, user_token):
     assert response.status_code == 422
 
 
-def test_return_other_users_rental(client, user_token, test_asset, user_in_club, admin_token, admin_club):
+def test_return_other_users_rental(
+    client, user_token, test_asset, user_in_club, admin_token, admin_club, return_payload
+):
     """Test that user cannot return another user's rental"""
     # Admin borrows the item
     borrow_payload = {
@@ -427,6 +434,7 @@ def test_return_other_users_rental(client, user_token, test_asset, user_in_club,
     # Regular user tries to return admin's rental
     response = client.post(
         f"/api/rentals/{rental_id}/return",
+        json=return_payload,
         headers={"Authorization": f"Bearer {user_token}"},
     )
     
@@ -434,7 +442,7 @@ def test_return_other_users_rental(client, user_token, test_asset, user_in_club,
     assert "본인이 대여한 물품이 아님" in response.json()["detail"]
 
 
-def test_return_already_returned_item(client, user_token, test_asset, user_in_club):
+def test_return_already_returned_item(client, user_token, test_asset, user_in_club, return_payload):
     """Test returning an already returned item"""
     # Borrow the item
     borrow_payload = {
@@ -451,6 +459,7 @@ def test_return_already_returned_item(client, user_token, test_asset, user_in_cl
     # Return it once
     first_return = client.post(
         f"/api/rentals/{rental_id}/return",
+        json=return_payload,
         headers={"Authorization": f"Bearer {user_token}"},
     )
     assert first_return.status_code == 200
@@ -458,6 +467,7 @@ def test_return_already_returned_item(client, user_token, test_asset, user_in_cl
     # Try to return again
     second_return = client.post(
         f"/api/rentals/{rental_id}/return",
+        json=return_payload,
         headers={"Authorization": f"Bearer {user_token}"},
     )
     
@@ -465,10 +475,11 @@ def test_return_already_returned_item(client, user_token, test_asset, user_in_cl
     assert "이미 반납된 물품" in second_return.json()["detail"]
 
 
-def test_return_without_auth(client):
+def test_return_without_auth(client, return_payload):
     """Test returning without authentication"""
     response = client.post(
         "/api/rentals/rental-001/return",
+        json=return_payload,
     )
     
     assert response.status_code == 401
@@ -500,7 +511,9 @@ def test_quantity_decreases_on_borrow(client, user_token, test_asset, user_in_cl
         session.close()
 
 
-def test_quantity_increases_on_return(client, user_token, test_asset, user_in_club, db_session):
+def test_quantity_increases_on_return(
+    client, user_token, test_asset, user_in_club, db_session, return_payload
+):
     """Test that available quantity increases when item is returned"""
     # Borrow the item
     borrow_payload = {
@@ -527,6 +540,7 @@ def test_quantity_increases_on_return(client, user_token, test_asset, user_in_cl
     # Return the item
     return_response = client.post(
         f"/api/rentals/{rental_id}/return",
+        json=return_payload,
         headers={"Authorization": f"Bearer {user_token}"},
     )
     assert return_response.status_code == 200

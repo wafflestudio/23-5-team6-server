@@ -1,10 +1,12 @@
 from typing import Annotated, Optional
+import math
 from datetime import datetime, date
 import math
 from fastapi import Depends, HTTPException, status
 from asset_management.app.schedule.repositories import ScheduleRepository
 from asset_management.app.schedule.models import Schedule, Status
 from asset_management.app.assets.repositories import AssetRepository
+from asset_management.app.club.models import Club
 from asset_management.app.club.models import Club
 from asset_management.app.rental.schemas import RentalResponse
 from asset_management.database.session import get_session
@@ -95,7 +97,6 @@ class RentalService:
         location_lng: Optional[int] = None,
     ) -> RentalResponse:
         """물품 반납"""
-
         schedule = self.db_session.query(Schedule).filter(Schedule.id == rental_id).first()
         
         if not schedule:
