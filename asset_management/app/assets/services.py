@@ -1,6 +1,9 @@
+import csv
+from datetime import datetime
+from io import StringIO
 from typing import Annotated, List
 
-from fastapi import Depends
+from fastapi import Depends, UploadFile
 from asset_management.app.assets.repositories import AssetRepository
 from asset_management.app.assets.schemas import AssetCreateRequest, AssetResponse, AssetUpdateRequest
 from asset_management.app.assets.models import Asset
@@ -102,3 +105,55 @@ class AssetService:
             )
             for asset in assets
         ]
+    
+    def generate_import_template(self) -> str:
+        output = StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["name", "description", "total_quantity", "available_quantity", "location", "created_at"])
+        writer.writerow(["예시 행입니다. 이름은 50자", "설명은 500자","최대 수량","대여 가능 수량", "동아리 내 위치(100자 이하)", "2024-01-01 00:00:00"])
+        csv_content = output.getvalue()
+        output.close()
+        return csv_content
+    
+    async def import_assets_from_csv(self, club_id: int, file: UploadFile) -> dict:
+        contents = await file.read()
+        
+        csv_data = StringIO(contents.decode("utf-8"))
+        reader = csv.DictReader(csv_data)
+        failed = []
+        imported_count = 0
+        for row in reader:
+          try:
+            self.asset_repository.create_asset(Asset(
+              name=row["name"],
+              description=row["description"],
+              total_quantity=int(row["total_quantity"]),
+              available_quantity=int(row["available_quantity"]),
+              location=row["location"],
+              created_at=datetime.strptime(row["created_at"], "%Y-%m-%d %H:%M:%S"),
+              club_id=club_id
+            ))
+            imported_count += 1
+          except Exception:
+            failed.append(row)
+        return {"imported": imported_count, "failed": failed}
+        
+        
+    
+    def export_assets_to_csv(self, club_id: int) -> str:
+        output = StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["name", "description", "total_quantity", "available_quantity", "location", "created_at"])
+        assets = self.asset_repository.get_all_assets_in_club(club_id)
+        for asset in assets:
+            writer.writerow([
+                asset.name,
+                asset.description,
+                asset.total_quantity,
+                asset.available_quantity,
+                asset.location,
+                asset.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+            ])
+        csv_content = output.getvalue()
+        output.close()
+        return csv_content
