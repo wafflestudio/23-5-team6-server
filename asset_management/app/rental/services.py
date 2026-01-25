@@ -1,16 +1,16 @@
 from typing import Annotated, Optional
 import math
 from datetime import datetime, date
-import math
 from fastapi import Depends, HTTPException, status
 from asset_management.app.schedule.repositories import ScheduleRepository
 from asset_management.app.schedule.models import Schedule, Status
 from asset_management.app.assets.repositories import AssetRepository
 from asset_management.app.club.models import Club
-from asset_management.app.club.models import Club
+from asset_management.app.assets.models import Asset
 from asset_management.app.rental.schemas import RentalResponse
 from asset_management.database.session import get_session
 from sqlalchemy.orm import Session
+from sqlalchemy import update
 
 
 class RentalService:
@@ -59,12 +59,20 @@ class RentalService:
                 detail="존재하지 않는 물품 ID",
             )
 
-        # 대여 가능 수량 확인
-        if asset.available_quantity <= 0:
+        # 대여 가능 수량 확인 및 감소 (낙관적 락)
+        result = self.db_session.execute(
+            update(Asset)
+            .where(Asset.id == item_id, Asset.available_quantity > 0)
+            .values(available_quantity=Asset.available_quantity - 1)
+        )
+        
+        if result.rowcount == 0:
+            self.db_session.rollback()
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="대여 가능한 수량 없음",
+                detail="대여 가능한 수량이 없습니다",
             )
+
 
         # Schedule 생성 (borrowed 상태)
         borrowed_at = datetime.now()
@@ -80,9 +88,6 @@ class RentalService:
         )
         
         self.db_session.add(schedule)
-        
-        # 수량 감소
-        asset.available_quantity -= 1
         
         self.db_session.commit()
         self.db_session.refresh(schedule)
@@ -105,18 +110,7 @@ class RentalService:
                 detail="존재하지 않는 대여 기록",
             )
 
-        if schedule.user_id != user_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="본인이 대여한 물품이 아님",
-            )
-
-        if schedule.status == Status.RETURNED.value:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="이미 반납된 물품",
-            )
-
+        # 위치 검증 먼저
         club = self.db_session.query(Club).filter(Club.id == schedule.club_id).first()
         club_lat = getattr(club, "location_lat", None) if club else None
         club_lng = getattr(club, "location_lng", None) if club else None
@@ -148,15 +142,33 @@ class RentalService:
 
         # 반납 처리
         returned_at = datetime.now()
-        schedule.status = Status.RETURNED.value
-        schedule.end_date = returned_at  # 반납 시각 기록
         
-        # 수량 증가
-        asset = self.asset_repo.get_asset_by_id(schedule.asset_id)
-        if asset:
-            asset.available_quantity += 1
+        # 낙관적 락으로 반납 상태 업데이트
+        result = self.db_session.execute(
+            update(Schedule)
+            .where(
+                Schedule.id == rental_id,
+                Schedule.user_id == user_id,
+                Schedule.status == Status.IN_USE.value,
+            )
+            .values(status=Status.RETURNED.value, end_date=returned_at)
+        )
+
+        if result.rowcount == 0:
+            self.db_session.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="이미 반납되었거나 반납할 수 없는 상태",
+            )
+
+        self.db_session.execute(
+            update(Asset)
+            .where(Asset.id == schedule.asset_id)
+            .values(available_quantity=Asset.available_quantity + 1)
+        )
+
         
         self.db_session.commit()
-        self.db_session.refresh(schedule)
+        schedule = self.db_session.query(Schedule).filter(Schedule.id == rental_id).first()
 
         return self._schedule_to_rental(schedule)
