@@ -70,7 +70,7 @@ class RentalService:
             self.db_session.rollback()
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="대여 가능한 수량이 없습니다",
+                detail="대여 가능한 수량 없음",
             )
 
 
@@ -108,6 +108,18 @@ class RentalService:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="존재하지 않는 대여 기록",
+            )
+        
+        if schedule.user_id != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="본인이 대여한 물품이 아님",
+            )
+        
+        if schedule.status == Status.RETURNED.value:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="이미 반납된 물품",
             )
 
         # 위치 검증 먼저
