@@ -1,3 +1,5 @@
+import os
+import tempfile
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -12,21 +14,33 @@ from asset_management.database.session import get_session
 import_models()
 
 # Use SQLite in-memory database for testing instead of MySQL
-TEST_DATABASE_URL = "sqlite+pysqlite:///:memory:"
 
 @pytest.fixture(scope="function")
 def test_db():
     """Create a fresh database for each test"""
+    # concurrency 테스트를 위해 일부 수정
+    fd, db_path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+
+    test_database_url = f"sqlite+pysqlite:///{db_path}"
+
     engine = create_engine(
-        TEST_DATABASE_URL,
+        test_database_url,
         connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-        future=True
+        future=True,
     )
+
     Base.metadata.create_all(bind=engine)
-    yield engine
-    Base.metadata.drop_all(bind=engine)
-    engine.dispose()
+
+    try:
+        yield engine
+    finally:
+        Base.metadata.drop_all(bind=engine)
+        engine.dispose()
+        try:
+            os.remove(db_path)
+        except FileNotFoundError:
+            pass
 
 
 @pytest.fixture(scope="function")
