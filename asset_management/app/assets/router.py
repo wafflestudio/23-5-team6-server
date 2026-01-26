@@ -4,8 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Header, status, Response, File, UploadFile
 from asset_management.app.assets.schemas import AssetCreateRequest, AssetResponse, AssetUpdateRequest, ImportResponse
 from asset_management.app.assets.services import AssetService
-# from asset_management.app.assets.utils import (
-# )
+from asset_management.app.picture.services import PictureService
 
 from asset_management.app.auth.dependencies import get_current_user
 from asset_management.app.user.models import User
@@ -64,3 +63,13 @@ def export_assets(
 def list_assets(club_id: int, asset_service: AssetService = Depends(AssetService)) -> list[AssetResponse]:
   assets = asset_service.list_assets_for_club(club_id)
   return assets
+
+
+@router.get("/{asset_id}/pictures", status_code=status.HTTP_200_OK)
+def get_asset_pictures(
+    asset_id: int,
+    picture_service: Annotated[PictureService, Depends()],
+):
+    """특정 asset의 모든 사진 메타데이터 목록을 가져옵니다."""
+    pictures = picture_service.list_pictures_by_asset(asset_id)
+    return pictures
