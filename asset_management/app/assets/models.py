@@ -26,7 +26,6 @@ class Asset(Base):
 
     club_id: Mapped[int] = mapped_column(ForeignKey("club.id"), nullable=False)
     category_id: Mapped[Optional[int]] = mapped_column(ForeignKey("category.id"), nullable=True)
-    # picture_id: Mapped[Optional[int]] = mapped_column(ForeignKey("picture.id"), nullable=True)
 
     # Relationships
     club: Mapped["Club"] = relationship(back_populates="assets")
@@ -34,13 +33,6 @@ class Asset(Base):
     schedules: Mapped[List["Schedule"]] = relationship(back_populates="asset")
     favorites: Mapped[List["Favorite"]] = relationship(back_populates="asset")
     statistics: Mapped[Optional["Statistic"]] = relationship(back_populates="asset", uselist=False)
-    # main_picture: Mapped[Optional["Picture"]] = relationship(
-    #     foreign_keys=[picture_id]
-    # )
-    # pictures: Mapped[List["Picture"]] = relationship(
-    #     back_populates="asset",
-    #     foreign_keys="[Picture.assets_id]"
-    # )
     pictures: Mapped[List["Picture"]] = relationship(
         back_populates="asset",
         cascade="all, delete-orphan"
