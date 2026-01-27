@@ -1,9 +1,11 @@
 import csv
 from datetime import datetime
-from io import StringIO
+from io import StringIO, BytesIO
 from typing import Annotated, List
 
 from fastapi import Depends, UploadFile
+from openpyxl import Workbook, load_workbook
+from openpyxl.utils import get_column_letter
 from asset_management.app.assets.repositories import AssetRepository
 from asset_management.app.assets.schemas import AssetCreateRequest, AssetResponse, AssetUpdateRequest
 from asset_management.app.assets.models import Asset
@@ -106,47 +108,74 @@ class AssetService:
             for asset in assets
         ]
     
-    def generate_import_template(self) -> str:
-        output = StringIO()
-        writer = csv.writer(output)
-        writer.writerow(["name", "description", "total_quantity", "available_quantity", "location", "created_at"])
-        writer.writerow(["예시 행입니다. 이름은 50자", "설명은 500자","최대 수량","대여 가능 수량", "동아리 내 위치(100자 이하)", "2024-01-01 00:00:00"])
-        csv_content = output.getvalue()
-        output.close()
-        return csv_content
+    def generate_import_template(self) -> bytes:
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Asset Template"
+        
+        # 헤더 작성
+        headers = ["name", "description", "total_quantity", "available_quantity", "location", "created_at"]
+        ws.append(headers)
+        
+        # 예시 행 작성
+        ws.append(["예시 행입니다. 이름은 50자", "설명은 500자", "최대 수량", "대여 가능 수량", "동아리 내 위치(100자 이하)", "2024-01-01 00:00:00"])
+        
+        # 열 너비 자동 조정
+        for col in range(1, len(headers) + 1):
+            ws.column_dimensions[get_column_letter(col)].width = 20
+        
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+        return output.getvalue()
     
-    async def import_assets_from_csv(self, club_id: int, file: UploadFile) -> dict:
+    async def import_assets_from_excel(self, club_id: int, file: UploadFile) -> dict:
         contents = await file.read()
         
-        csv_data = StringIO(contents.decode("utf-8"))
-        reader = csv.DictReader(csv_data)
+        wb = load_workbook(BytesIO(contents))
+        ws = wb.active
+        
         failed = []
         imported_count = 0
-        for row in reader:
-          try:
-            self.asset_repository.create_asset(Asset(
-              name=row["name"],
-              description=row["description"],
-              total_quantity=int(row["total_quantity"]),
-              available_quantity=int(row["available_quantity"]),
-              location=row["location"],
-              created_at=datetime.strptime(row["created_at"], "%Y-%m-%d %H:%M:%S"),
-              club_id=club_id
-            ))
-            imported_count += 1
-          except Exception:
-            failed.append(row)
+        
+        # 헤더 행 가져오기 (첫 번째 행)
+        headers = [cell.value for cell in ws[1]]
+        
+        # 데이터 행 처리 (2번째 행부터)
+        for row in ws.iter_rows(min_row=2, values_only=True):
+            if not any(row):  # 빈 행 건너뛰기
+                continue
+            try:
+                row_dict = dict(zip(headers, row))
+                self.asset_repository.create_asset(Asset(
+                    name=str(row_dict["name"]),
+                    description=str(row_dict["description"]) if row_dict["description"] else "",
+                    total_quantity=int(row_dict["total_quantity"]),
+                    available_quantity=int(row_dict["available_quantity"]),
+                    location=str(row_dict["location"]) if row_dict["location"] else "",
+                    created_at=datetime.strptime(str(row_dict["created_at"]), "%Y-%m-%d %H:%M:%S"),
+                    club_id=club_id
+                ))
+                imported_count += 1
+            except Exception as e:
+                failed.append({"row": row_dict if 'row_dict' in locals() else row, "error": str(e)})
         return {"imported": imported_count, "failed": failed}
         
         
     
-    def export_assets_to_csv(self, club_id: int) -> str:
-        output = StringIO()
-        writer = csv.writer(output)
-        writer.writerow(["name", "description", "total_quantity", "available_quantity", "location", "created_at"])
+    def export_assets_to_excel(self, club_id: int) -> bytes:
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Assets"
+        
+        # 헤더 작성
+        headers = ["name", "description", "total_quantity", "available_quantity", "location", "created_at"]
+        ws.append(headers)
+        
+        # 자산 데이터 작성
         assets = self.asset_repository.get_all_assets_in_club(club_id)
         for asset in assets:
-            writer.writerow([
+            ws.append([
                 asset.name,
                 asset.description,
                 asset.total_quantity,
@@ -154,6 +183,12 @@ class AssetService:
                 asset.location,
                 asset.created_at.strftime("%Y-%m-%d %H:%M:%S"),
             ])
-        csv_content = output.getvalue()
-        output.close()
-        return csv_content
+        
+        # 열 너비 자동 조정
+        for col in range(1, len(headers) + 1):
+            ws.column_dimensions[get_column_letter(col)].width = 20
+        
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+        return output.getvalue()

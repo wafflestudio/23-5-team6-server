@@ -15,13 +15,13 @@ router = APIRouter(prefix="/assets", tags=["assets"])
 
 @router.get("/import_template", status_code=status.HTTP_200_OK)
 def download_import_template(asset_service: Annotated[AssetService, Depends()]):
-  """csv 템플릿 파일을 다운로드합니다."""
+  """자산 등록용 Excel 템플릿 파일을 다운로드합니다."""
   template_content = asset_service.generate_import_template()
   return Response(
     content=template_content,
-    media_type="text/csv",
+    media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     headers={
-      "Content-Disposition": "attachment; filename=asset_import_template.csv"
+      "Content-Disposition": "attachment; filename=asset_import_template.xlsx"
     }
   )
 
@@ -32,11 +32,11 @@ async def import_assets(
   user: Annotated[User, Depends(get_current_user)],
   asset_service: Annotated[AssetService, Depends()],
 ) -> ImportResponse:
-  """csv 파일을 통해 자산을 대량으로 등록합니다. (관리자 전용)"""
+  """Excel 파일을 통해 자산을 대량으로 등록합니다. (관리자 전용)"""
   if user.is_admin is False:
     raise HTTPException(status_code=403, detail="관리자 권한이 필요합니다.")
   try:
-    result = await asset_service.import_assets_from_csv(user.user_clublists[0].club_id, file)
+    result = await asset_service.import_assets_from_excel(user.user_clublists[0].club_id, file)
     return ImportResponse(imported=result["imported"], failed=result["failed"])
   except Exception as e:
     raise HTTPException(status_code=400, detail=str(e)) from e
@@ -46,15 +46,15 @@ async def import_assets(
 def export_assets(
   user: Annotated[User, Depends(get_current_user)], asset_service: Annotated[AssetService, Depends()]
 ):
-  """자산 목록을 csv 파일로 내보냅니다.(관리자 전용)"""
+  """자산 목록을 Excel 파일로 내보냅니다.(관리자 전용)"""
   if user.is_admin is False:
     raise HTTPException(status_code=403, detail="관리자 권한이 필요합니다.")
-  csv_content = asset_service.export_assets_to_csv(user.user_clublists[0].club_id)
+  excel_content = asset_service.export_assets_to_excel(user.user_clublists[0].club_id)
   return Response(
-    content=csv_content,
-    media_type="text/csv",
+    content=excel_content,
+    media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     headers={
-      "Content-Disposition": f"attachment; filename=asset_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+      "Content-Disposition": f"attachment; filename=asset_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     }
   )
 
