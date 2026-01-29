@@ -16,6 +16,9 @@ class AuthRepository:
     
     def get_user_by_email(self, email: str) -> User | None:
         return self.db_session.query(User).filter(User.email == email).first()
+
+    def get_user_by_social_email(self, email: str) -> User | None:
+        return self.db_session.query(User).filter(User.social_email == email).first()
     
     def add_refresh_token(self, token: str, user_id: str, expires_at) -> None:
       refresh_token = RefreshToken(

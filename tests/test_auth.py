@@ -3,6 +3,8 @@ from pydantic_settings import SettingsConfigDict
 import pytest
 from datetime import datetime, timedelta
 from asset_management.app.auth.settings import AuthSettings
+from asset_management.app.auth.services import AuthServices
+from asset_management.app.user.models import User
 from tests.conftest import SETTINGS
 from authlib.jose import jwt, JWTClaims
 
@@ -112,3 +114,70 @@ def test_logout(client: TestClient, auth_token):
     "/api/auth/refresh",
     headers={"Authorization": f"Bearer {access_token}"})
   assert response.status_code == 401
+
+
+def _mock_google_token(monkeypatch, email: str, name: str = "Google User"):
+  def _verify(self, id_token: str) -> dict:
+    return {
+      "email": email,
+      "email_verified": "true",
+      "aud": "test",
+      "name": name,
+    }
+  monkeypatch.setattr(AuthServices, "_verify_google_id_token", _verify)
+
+
+def test_google_login_creates_user(client: TestClient, monkeypatch, db_session):
+  _mock_google_token(monkeypatch, "google_user@example.com")
+
+  response = client.post("/api/auth/google", json={"id_token": "fake"})
+  assert response.status_code == 200
+  data = response.json()
+  assert "tokens" in data
+  assert data["user_name"] == "Google User"
+
+  session = db_session()
+  try:
+    user = session.query(User).filter(User.social_email == "google_user@example.com").first()
+    assert user is not None
+    assert user.is_admin is False
+  finally:
+    session.close()
+
+
+def test_google_login_links_existing_user(client: TestClient, monkeypatch, db_session):
+  payload = {
+    "name": "Email User",
+    "email": "email_user@example.com",
+    "password": "testpassword",
+  }
+  signup_response = client.post("/api/users/signup", json=payload)
+  assert signup_response.status_code == 201
+
+  _mock_google_token(monkeypatch, payload["email"], name="Email User")
+  response = client.post("/api/auth/google", json={"id_token": "fake"})
+  assert response.status_code == 200
+
+  session = db_session()
+  try:
+    user = session.query(User).filter(User.email == payload["email"]).first()
+    assert user is not None
+    assert user.social_email == payload["email"]
+  finally:
+    session.close()
+
+
+def test_google_login_denied_for_admin(client: TestClient, monkeypatch):
+  admin_payload = {
+    "name": "Admin",
+    "email": "admin_google@example.com",
+    "password": "adminpass123",
+    "club_name": "Admin Club",
+    "club_description": "Admin club",
+  }
+  signup_response = client.post("/api/admin/signup", json=admin_payload)
+  assert signup_response.status_code == 201
+
+  _mock_google_token(monkeypatch, admin_payload["email"], name="Admin")
+  response = client.post("/api/auth/google", json={"id_token": "fake"})
+  assert response.status_code == 403
