@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Header, status, Response
 from sqlalchemy.orm import Session
-from asset_management.app.auth.schemas import LoginResponse, UserSignin, TokenResponse
+from asset_management.app.auth.schemas import LoginResponse, UserSignin, TokenResponse, GoogleSignin
 from asset_management.app.auth.services import AuthServices
 from asset_management.app.auth.utils import (
   issue_token,
@@ -21,6 +21,14 @@ def login(
   request: UserSignin, auth_service: Annotated[AuthServices, Depends()]
 ) -> LoginResponse:
   login_info = auth_service.login_user(request.email, request.password)
+  return LoginResponse(**login_info)
+
+
+@router.post("/google", status_code=status.HTTP_200_OK)
+def google_login(
+  request: GoogleSignin, auth_service: Annotated[AuthServices, Depends()]
+) -> LoginResponse:
+  login_info = auth_service.login_google(request.id_token)
   return LoginResponse(**login_info)
 
 
