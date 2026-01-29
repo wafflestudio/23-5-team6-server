@@ -4,6 +4,7 @@ from asset_management.settings import SETTINGS
 class AuthSettings(BaseSettings):
     ACCESS_TOKEN_SECRET: str
     REFRESH_TOKEN_SECRET: str
+    GOOGLE_CLIENT_ID: str | None = None
     SHORT_SESSION_LIFESPAN: int = 15
     LONG_SESSION_LIFESPAN: int = 24 * 60
 
