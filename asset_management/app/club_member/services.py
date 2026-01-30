@@ -32,6 +32,7 @@ class ClubMemberService:
           id=member.id,
           user_id=member.user_id,
           name=member.user.name,
+          email=member.user.email if member.user.email else member.user.social_email,
           club_id=member.club_id,
           permission=member.permission,
         )
@@ -53,6 +54,7 @@ class ClubMemberService:
           id=member.id,
           user_id=member.user_id,
           name=member.user.name,
+          email=member.user.email if member.user.email else member.user.social_email,
           club_id=member.club_id,
           permission=member.permission,
         )
@@ -72,6 +74,7 @@ class ClubMemberService:
       id=member.id,
       user_id=member.user_id,
       name=member.user.name,
+      email=member.user.email if member.user.email else member.user.social_email,
       club_id=member.club_id,
       permission=member.permission,
     )
@@ -102,6 +105,7 @@ class ClubMemberService:
       id=member.id,
       user_id=member.user_id,
       name=member.user.name,
+      email=member.user.email if member.user.email else member.user.social_email,
       club_id=member.club_id,
       permission=member.permission,
     )
@@ -123,6 +127,7 @@ class ClubMemberService:
       id=member.id,
       user_id=member.user_id,
       name=member.user.name,
+      email=member.user.email if member.user.email else member.user.social_email,
       club_id=member.club_id,
       permission=member.permission,
     )

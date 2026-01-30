@@ -94,6 +94,10 @@ def test_create_club_member(client: TestClient, admin_token, test_club_with_admi
     assert data["club_id"] == payload["club_id"]
     assert data["permission"] == payload["permission"]
     assert "id" in data
+    assert "email" in data
+    assert data["email"] == user_data["email"]
+    assert "name" in data
+    assert data["name"] == user_data["name"]
 
 
 def test_get_club_members_list(client: TestClient, admin_token, test_club_with_admin, user_data):
@@ -121,6 +125,11 @@ def test_get_club_members_list(client: TestClient, admin_token, test_club_with_a
     assert "items" in data
     assert isinstance(data["items"], list)
     assert len(data["items"]) > 0
+    # 모든 멤버에 email과 name 필드가 있는지 확인
+    for member in data["items"]:
+        assert "email" in member
+        assert "name" in member
+        assert member["email"] is not None
 
 
 def test_get_club_members_by_club_id(
@@ -146,6 +155,10 @@ def test_get_club_members_by_club_id(
     data = response.json()
     assert len(data["items"]) >= 2  # admin + user
     assert all(member["club_id"] == test_club_with_admin["id"] for member in data["items"])
+    # 모든 멤버에 email과 name 필드가 있는지 확인
+    for member in data["items"]:
+        assert "email" in member
+        assert "name" in member
 
 
 def test_get_club_members_by_user_id(
@@ -171,6 +184,9 @@ def test_get_club_members_by_user_id(
     data = response.json()
     assert len(data["items"]) > 0
     assert all(member["user_id"] == user_data["id"] for member in data["items"])
+    # email 필드 확인
+    assert data["items"][0]["email"] == user_data["email"]
+    assert data["items"][0]["name"] == user_data["name"]
 
 
 def test_get_club_members_by_member_id(
@@ -298,6 +314,13 @@ def test_update_club_member(client: TestClient, admin_token, test_club_with_admi
         json=update_payload,
         headers={"Authorization": f"Bearer {admin_token}"},
     )
+
+    assert response.status_code == 200
+    updated_data = response.json()
+    assert updated_data["permission"] == 2
+    assert "email" in updated_data
+    assert updated_data["email"] == user_data["email"]
+    assert "name" in updated_data
 
     assert response.status_code == 200
     data = response.json()
