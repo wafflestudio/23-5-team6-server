@@ -30,9 +30,19 @@ class Asset(Base):
     # Relationships
     club: Mapped["Club"] = relationship(back_populates="assets")
     category: Mapped[Optional["Category"]] = relationship(back_populates="assets")
-    schedules: Mapped[List["Schedule"]] = relationship(back_populates="asset")
-    favorites: Mapped[List["Favorite"]] = relationship(back_populates="asset")
-    statistics: Mapped[Optional["Statistic"]] = relationship(back_populates="asset", uselist=False)
+    schedules: Mapped[List["Schedule"]] = relationship(
+        back_populates="asset",
+        cascade="all, delete-orphan"
+    )
+    favorites: Mapped[List["Favorite"]] = relationship(
+        back_populates="asset",
+        cascade="all, delete-orphan"
+    )
+    statistics: Mapped[Optional["Statistic"]] = relationship(
+        back_populates="asset",
+        uselist=False,
+        cascade="all, delete-orphan"
+    )
     pictures: Mapped[List["Picture"]] = relationship(
         back_populates="asset",
         cascade="all, delete-orphan"
