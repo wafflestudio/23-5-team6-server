@@ -51,11 +51,17 @@ class ClubMemberRepository:
     ) -> UserClublist:
         club = (
             self.db_session.query(Club)
-            .filter(Club.code == club_code)
+            .filter(Club.club_code == club_code)
             .first()
         )
         if club is None:
             return None
+        
+        from asset_management.app.user.models import User
+        user = self.db_session.query(User).filter(User.id == user_id).first()
+        if user is None:
+            return None
+            
         new_member = UserClublist(
             user_id=user_id,
             club_id=club.id,
@@ -64,8 +70,8 @@ class ClubMemberRepository:
         self.db_session.add(new_member)
         self.db_session.commit()
         self.db_session.refresh(new_member)
-        # Load the user relationship
-        self.db_session.refresh(new_member, ["user"])
+        # Manually load the user relationship
+        new_member.user = user
         return new_member
 
     def edit_club_member(

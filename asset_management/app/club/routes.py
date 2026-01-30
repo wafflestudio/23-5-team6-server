@@ -1,12 +1,13 @@
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, status, Response
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
+from asset_management.app.auth.dependencies import get_current_user
 from asset_management.app.club.models import Club
 from asset_management.app.club.schemas import ClubResponse, ClubUpdate
+from asset_management.app.user.models import User, UserClublist
 from asset_management.database.session import get_session
-from asset_management.app.user.models import UserClublist
 
 router = APIRouter(prefix="/clubs", tags=["clubs"])
 
@@ -15,6 +16,15 @@ router = APIRouter(prefix="/clubs", tags=["clubs"])
 def list_clubs(session: Session = Depends(get_session)):
     return session.query(Club).order_by(Club.id.asc()).all()
 
+@router.get("/me",)
+def my_clubs(
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> List[ClubResponse]:
+    user_clublists = session.query(UserClublist).filter(UserClublist.user_id == current_user.id).all()
+    club_ids = [clublist.club_id for clublist in user_clublists]
+    clubs = session.query(Club).filter(Club.id.in_(club_ids)).all()
+    return clubs
 
 @router.get(
     "/{club_id}",
