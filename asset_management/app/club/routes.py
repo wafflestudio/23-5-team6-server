@@ -55,6 +55,10 @@ def update_club(
         
     if payload.description is not None:
         club.description = payload.description
+    if payload.location_lat is not None:
+        club.location_lat = payload.location_lat
+    if payload.location_lng is not None:
+        club.location_lng = payload.location_lng
 
     session.commit()
     session.refresh(club)

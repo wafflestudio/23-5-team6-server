@@ -36,6 +36,32 @@ def test_club_crud_via_admin_signup(client):
     assert missing_response.status_code == 404
 
 
+def test_update_club_location(client):
+    admin_payload = {
+        "name": "Location Admin",
+        "email": "location_admin@example.com",
+        "password": "strongpassword",
+        "club_name": "Location Club",
+        "club_description": "Test club for location update",
+    }
+    signup_response = client.post("/api/admin/signup", json=admin_payload)
+    assert signup_response.status_code == 201
+    club_id = signup_response.json()["club_id"]
+
+    update_payload = {"location_lat": 3712, "location_lng": 12705}
+    update_response = client.put(f"/api/clubs/{club_id}", json=update_payload)
+    assert update_response.status_code == 200
+    update_data = update_response.json()
+    assert update_data["location_lat"] == update_payload["location_lat"]
+    assert update_data["location_lng"] == update_payload["location_lng"]
+
+    get_response = client.get(f"/api/clubs/{club_id}")
+    assert get_response.status_code == 200
+    get_data = get_response.json()
+    assert get_data["location_lat"] == update_payload["location_lat"]
+    assert get_data["location_lng"] == update_payload["location_lng"]
+
+
 def test_admin_signup_with_custom_club_code(client):
     admin_payload = {
         "name": "Admin Custom",
