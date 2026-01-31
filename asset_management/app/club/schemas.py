@@ -15,6 +15,8 @@ class ClubCreate(ClubBase):
 class ClubUpdate(BaseModel):
     name: Optional[str] = Field(None, max_length=30)
     description: Optional[str] = Field(None, max_length=255)
+    location_lat: Optional[int] = None
+    location_lng: Optional[int] = None
 
 
 class ClubResponse(ClubBase):
