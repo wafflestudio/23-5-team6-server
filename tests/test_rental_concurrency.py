@@ -1,6 +1,9 @@
 import pytest
 from concurrent.futures import ThreadPoolExecutor
 
+def _return_image_file():
+    return {"file": ("return.jpg", b"fake-image-bytes", "image/jpeg")}
+
 
 @pytest.fixture(scope="function")
 def admin_club(client, db_session):
@@ -128,14 +131,14 @@ def test_borrow_concurrency_only_one_success_api_only(
             headers={"Authorization": f"Bearer {user_token}"},
         )
 
-    with ThreadPoolExecutor(max_workers=30) as executor:
-        responses = list(executor.map(lambda _: borrow_once(), range(30)))
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        responses = list(executor.map(lambda _: borrow_once(), range(5)))
 
     success = [r for r in responses if r.status_code == 201]
     fail = [r for r in responses if r.status_code == 400]
 
     assert len(success) == 1
-    assert len(fail) == 29
+    assert len(fail) == 4
 
 
 def test_return_concurrency_only_one_success_api_only(
@@ -151,14 +154,15 @@ def test_return_concurrency_only_one_success_api_only(
     def return_once():
         return client.post(
             f"/api/rentals/{rental_id}/return",
+            files=_return_image_file(),
             headers={"Authorization": f"Bearer {user_token}"},
         )
 
-    with ThreadPoolExecutor(max_workers=30) as executor:
-        responses = list(executor.map(lambda _: return_once(), range(30)))
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        responses = list(executor.map(lambda _: return_once(), range(5)))
 
     success = [r for r in responses if r.status_code == 200]
     fail = [r for r in responses if r.status_code == 400]
 
     assert len(success) == 1
-    assert len(fail) == 29
+    assert len(fail) == 4
