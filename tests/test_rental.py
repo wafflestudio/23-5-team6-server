@@ -207,6 +207,27 @@ def user_in_club_with_location(
     return test_user_location
 
 
+@pytest.fixture(scope="function")
+def test_asset_with_max_rental_days(client, admin_token, admin_club):
+    """Create a test asset with max_rental_days"""
+    asset_payload = {
+        "name": "Test Camera (Max Days)",
+        "description": "Canon EOS R5",
+        "category_id": None,
+        "quantity": 3,
+        "location": "Storage Room A",
+        "club_id": admin_club["club_id"],
+        "max_rental_days": 1,
+    }
+    response = client.post(
+        "/api/admin/assets",
+        json=asset_payload,
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code == 201, f"Failed to create asset: {response.text}"
+    return response.json()
+
+
 def test_borrow_item_success(client, user_token, test_asset, user_in_club):
     """Test successful item borrowing"""
     tomorrow = date.today() + timedelta(days=1)
@@ -586,3 +607,56 @@ def test_multiple_borrows_same_item(client, user_token, test_asset, user_in_club
         assert second_borrow.json()["user_id"] == another_user_id
     else:
         assert second_borrow.status_code == 400
+
+def test_borrow_item_exceeds_max_rental_days_fails(
+    client,
+    user_token,
+    test_asset_with_max_rental_days,
+    user_in_club,
+):
+    """Test borrowing fails when expected_return_date exceeds asset.max_rental_days"""
+    # max_rental_days = 1 인 자산에 대해 2일 뒤 반납을 요청하면 초과
+    day_after_tomorrow = date.today() + timedelta(days=2)
+
+    payload = {
+        "item_id": test_asset_with_max_rental_days["id"],
+        "expected_return_date": day_after_tomorrow.isoformat(),
+    }
+
+    response = client.post(
+        "/api/rentals/borrow",
+        json=payload,
+        headers={"Authorization": f"Bearer {user_token}"},
+    )
+
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert detail["code"] == "최대 대여 일수 초과"
+    assert detail["max_rental_days"] == 1
+    assert detail["requested_days"] == 3  # 오늘~2일뒤 = 3일 (inclusive)
+
+def test_borrow_item_within_max_rental_days_success(
+    client,
+    user_token,
+    test_asset_with_max_rental_days,
+    user_in_club,
+):
+    """Test borrowing succeeds when expected_return_date is within max_rental_days"""
+    today = date.today()
+
+    payload = {
+        "item_id": test_asset_with_max_rental_days["id"],
+        "expected_return_date": today.isoformat(),
+    }
+
+    response = client.post(
+        "/api/rentals/borrow",
+        json=payload,
+        headers={"Authorization": f"Bearer {user_token}"},
+    )
+
+    assert response.status_code == 201
+    data = response.json()
+    assert data["item_id"] == test_asset_with_max_rental_days["id"]
+    assert data["status"] == "borrowed"
+    assert data["expected_return_date"] == today.isoformat()
