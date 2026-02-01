@@ -23,6 +23,7 @@ class AssetResponse(BaseModel):
 
     location: Optional[str] = None
     created_at: datetime
+    max_rental_days: Optional[int] = None
 
     class Config:
         from_attributes = True
@@ -34,6 +35,7 @@ class AssetCreateRequest(BaseModel):
     category_id: Optional[int] = Field(None)
     quantity: int = Field(..., ge=1)
     location: Optional[str] = Field(None, max_length=100)
+    max_rental_days: Optional[int] = Field(None, ge=1)
 
 class AssetUpdateRequest(BaseModel):
     name: Optional[str] = Field(None, max_length=100)
@@ -42,4 +44,5 @@ class AssetUpdateRequest(BaseModel):
     category_id: Optional[int] = Field(None)
     quantity: Optional[int] = Field(None, ge=1)
     location: Optional[str] = Field(None, max_length=100)
+    max_rental_days: Optional[int] = Field(None, ge=1)
 
