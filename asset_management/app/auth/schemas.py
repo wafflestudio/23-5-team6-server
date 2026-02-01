@@ -1,11 +1,22 @@
 from pydantic import BaseModel, EmailStr
 
+
 class UserSignin(BaseModel):
     email: EmailStr
     password: str
 
-class GoogleSignin(BaseModel):
-    id_token: str
+class GoogleAuthRequest(BaseModel):
+    code: str
+    code_verifier: str
+    redirect_uri: str
+
+class GoogleLinkResponse(BaseModel):
+    google_email: EmailStr
+    linked_at: str
+
+class GoogleStatusResponse(BaseModel):
+    is_linked: bool
+    google_email: EmailStr | None
 
 class TokenResponse(BaseModel):
     access_token: str

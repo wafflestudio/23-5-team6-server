@@ -117,6 +117,9 @@ def test_logout(client: TestClient, auth_token):
 
 
 def _mock_google_token(monkeypatch, email: str, name: str = "Google User"):
+  def _exchange(self, code: str, code_verifier: str, redirect_uri: str) -> dict:
+    return {"id_token": "fake"}
+
   def _verify(self, id_token: str) -> dict:
     return {
       "email": email,
@@ -124,28 +127,48 @@ def _mock_google_token(monkeypatch, email: str, name: str = "Google User"):
       "aud": "test",
       "name": name,
     }
+  monkeypatch.setattr(AuthServices, "_exchange_google_code_for_tokens", _exchange)
   monkeypatch.setattr(AuthServices, "_verify_google_id_token", _verify)
 
 
-def test_google_login_creates_user(client: TestClient, monkeypatch, db_session):
+def test_google_link_sets_social_email(client: TestClient, monkeypatch, db_session):
   _mock_google_token(monkeypatch, "google_user@example.com")
 
-  response = client.post("/api/auth/google", json={"id_token": "fake"})
+  payload = {
+    "name": "testuser",
+    "email": "testuser@example.com",
+    "password": "testpassword",
+  }
+  signup_response = client.post("/api/users/signup", json=payload)
+  assert signup_response.status_code == 201
+
+  login_response = client.post(
+    "/api/auth/login",
+    json={"email": payload["email"], "password": payload["password"]},
+  )
+  assert login_response.status_code == 200
+  token = login_response.json()["tokens"]["access_token"]
+
+  response = client.post(
+    "/api/auth/google/link",
+    json={"code": "authcode", "code_verifier": "verifier", "redirect_uri": "http://localhost/callback"},
+    headers={"Authorization": f"Bearer {token}"},
+  )
   assert response.status_code == 200
   data = response.json()
-  assert "tokens" in data
-  assert data["user_name"] == "Google User"
+  assert data["google_email"] == "google_user@example.com"
+  assert "linked_at" in data
 
   session = db_session()
   try:
-    user = session.query(User).filter(User.social_email == "google_user@example.com").first()
+    user = session.query(User).filter(User.email == payload["email"]).first()
     assert user is not None
-    assert user.is_admin is False
+    assert user.social_email == "google_user@example.com"
   finally:
     session.close()
 
 
-def test_google_login_links_existing_user(client: TestClient, monkeypatch, db_session):
+def test_google_login_for_linked_user(client: TestClient, monkeypatch, db_session):
   payload = {
     "name": "Email User",
     "email": "email_user@example.com",
@@ -154,8 +177,25 @@ def test_google_login_links_existing_user(client: TestClient, monkeypatch, db_se
   signup_response = client.post("/api/users/signup", json=payload)
   assert signup_response.status_code == 201
 
+  login_response = client.post(
+    "/api/auth/login",
+    json={"email": payload["email"], "password": payload["password"]},
+  )
+  assert login_response.status_code == 200
+  token = login_response.json()["tokens"]["access_token"]
+
   _mock_google_token(monkeypatch, payload["email"], name="Email User")
-  response = client.post("/api/auth/google", json={"id_token": "fake"})
+  link_response = client.post(
+    "/api/auth/google/link",
+    json={"code": "authcode", "code_verifier": "verifier", "redirect_uri": "http://localhost/callback"},
+    headers={"Authorization": f"Bearer {token}"},
+  )
+  assert link_response.status_code == 200
+
+  response = client.post(
+    "/api/auth/google/login",
+    json={"code": "authcode", "code_verifier": "verifier", "redirect_uri": "http://localhost/callback"},
+  )
   assert response.status_code == 200
 
   session = db_session()
@@ -167,7 +207,7 @@ def test_google_login_links_existing_user(client: TestClient, monkeypatch, db_se
     session.close()
 
 
-def test_google_login_denied_for_admin(client: TestClient, monkeypatch):
+def test_google_login_denied_for_admin(client: TestClient, monkeypatch, db_session):
   admin_payload = {
     "name": "Admin",
     "email": "admin_google@example.com",
@@ -178,6 +218,18 @@ def test_google_login_denied_for_admin(client: TestClient, monkeypatch):
   signup_response = client.post("/api/admin/signup", json=admin_payload)
   assert signup_response.status_code == 201
 
+  session = db_session()
+  try:
+    admin_user = session.query(User).filter(User.email == admin_payload["email"]).first()
+    assert admin_user is not None
+    admin_user.social_email = admin_payload["email"]
+    session.commit()
+  finally:
+    session.close()
+
   _mock_google_token(monkeypatch, admin_payload["email"], name="Admin")
-  response = client.post("/api/auth/google", json={"id_token": "fake"})
-  assert response.status_code == 403
+  response = client.post(
+    "/api/auth/google/login",
+    json={"code": "authcode", "code_verifier": "verifier", "redirect_uri": "http://localhost/callback"},
+  )
+  assert response.status_code == 400
