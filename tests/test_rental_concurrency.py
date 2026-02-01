@@ -1,6 +1,9 @@
 import pytest
 from concurrent.futures import ThreadPoolExecutor
 
+def _return_image_file():
+    return {"file": ("return.jpg", b"fake-image-bytes", "image/jpeg")}
+
 
 @pytest.fixture(scope="function")
 def admin_club(client, db_session):
@@ -151,6 +154,7 @@ def test_return_concurrency_only_one_success_api_only(
     def return_once():
         return client.post(
             f"/api/rentals/{rental_id}/return",
+            files=_return_image_file(),
             headers={"Authorization": f"Bearer {user_token}"},
         )
 

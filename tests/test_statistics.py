@@ -5,6 +5,9 @@ from fastapi.testclient import TestClient
 
 from asset_management.app.category.models import Category
 
+def _return_image_file():
+    return {"file": ("return.jpg", b"fake-image-bytes", "image/jpeg")}
+
 
 # ---------------- helpers ----------------
 
@@ -422,7 +425,7 @@ def test_statistics_with_return(
         "location_lat": 37_500_000,  # 37.5도
         "location_lng": 127_000_000  # 127.0도
     }
-    res = client.post(f"/api/rentals/{rental_id}/return", json=return_payload, headers=user_headers)
+    res = client.post(f"/api/rentals/{rental_id}/return", data=return_payload, files=_return_image_file(), headers=user_headers)
     assert res.status_code == 200, res.text
     
     # 통계 조회
