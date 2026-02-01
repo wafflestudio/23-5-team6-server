@@ -58,6 +58,36 @@ class RentalService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="존재하지 않는 물품 ID",
             )
+        
+        borrowed_at = datetime.now()
+
+        if expected_return_date is not None:
+            if expected_return_date < borrowed_at.date():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="반납 예정일은 대여일 이후여야 합니다",
+                )
+            
+            expected_end = datetime.combine(
+                expected_return_date,
+                datetime.max.time()
+            )
+            rental_days = (expected_end.date() - borrowed_at.date()).days + 1
+            end_date = expected_end
+        else:
+            rental_days = asset.max_rental_days if asset.max_rental_days is not None else -1
+            end_date = borrowed_at
+
+        if asset.max_rental_days is not None:
+            if rental_days > asset.max_rental_days:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={
+                        "code": "최대 대여 일수 초과",
+                        "max_rental_days": asset.max_rental_days,
+                        "requested_days": rental_days,
+                    },
+                )
 
         # 대여 가능 수량 확인 및 감소 (낙관적 락)
         result = self.db_session.execute(
@@ -74,9 +104,6 @@ class RentalService:
             )
 
 
-        # Schedule 생성 (borrowed 상태)
-        borrowed_at = datetime.now()
-        end_date = datetime.combine(expected_return_date, datetime.max.time()) if expected_return_date else datetime.now()
         
         schedule = Schedule(
             start_date=borrowed_at,
