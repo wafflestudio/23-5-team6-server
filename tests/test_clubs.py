@@ -11,6 +11,15 @@ def test_club_crud_via_admin_signup(client):
     admin_data = signup_response.json()
     club_id = admin_data["club_id"]
 
+    # 로그인하여 토큰 획득
+    login_response = client.post(
+        "/api/auth/login",
+        json={"email": admin_payload["email"], "password": admin_payload["password"]},
+    )
+    assert login_response.status_code == 200
+    token = login_response.json()["tokens"]["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
     create_response = client.post("/api/clubs", json={"name": "Direct Club"})
     assert create_response.status_code == 405
 
@@ -25,15 +34,135 @@ def test_club_crud_via_admin_signup(client):
     assert get_response.json()["name"] == admin_payload["club_name"]
 
     update_payload = {"name": "Updated Club"}
-    update_response = client.put(f"/api/clubs/{club_id}", json=update_payload)
+    update_response = client.put(f"/api/clubs/{club_id}", json=update_payload, headers=headers)
     assert update_response.status_code == 200
     assert update_response.json()["name"] == update_payload["name"]
 
-    delete_response = client.delete(f"/api/clubs/{club_id}")
+    delete_response = client.delete(f"/api/clubs/{club_id}", headers=headers)
     assert delete_response.status_code == 204
 
     missing_response = client.get(f"/api/clubs/{club_id}")
     assert missing_response.status_code == 404
+
+
+def test_update_club_unauthorized(client):
+    """인증 없이 동아리 수정 시 401 에러"""
+    admin_payload = {
+        "name": "Unauth Admin",
+        "email": "unauth_admin@example.com",
+        "password": "strongpassword",
+        "club_name": "Unauth Club",
+        "club_description": "Test club",
+    }
+    signup_response = client.post("/api/admin/signup", json=admin_payload)
+    assert signup_response.status_code == 201
+    club_id = signup_response.json()["club_id"]
+
+    # 토큰 없이 수정 시도
+    update_response = client.put(f"/api/clubs/{club_id}", json={"name": "Hacked"})
+    assert update_response.status_code == 401
+
+
+def test_delete_club_unauthorized(client):
+    """인증 없이 동아리 삭제 시 401 에러"""
+    admin_payload = {
+        "name": "Unauth Delete Admin",
+        "email": "unauth_delete@example.com",
+        "password": "strongpassword",
+        "club_name": "Unauth Delete Club",
+        "club_description": "Test club",
+    }
+    signup_response = client.post("/api/admin/signup", json=admin_payload)
+    assert signup_response.status_code == 201
+    club_id = signup_response.json()["club_id"]
+
+    # 토큰 없이 삭제 시도
+    delete_response = client.delete(f"/api/clubs/{club_id}")
+    assert delete_response.status_code == 401
+
+
+def test_update_club_forbidden_non_admin(client):
+    """관리자가 아닌 사용자가 동아리 수정 시 403 에러"""
+    # 관리자로 클럽 생성
+    admin_payload = {
+        "name": "Forbidden Admin",
+        "email": "forbidden_admin@example.com",
+        "password": "strongpassword",
+        "club_name": "Forbidden Club",
+        "club_description": "Test club",
+    }
+    signup_response = client.post("/api/admin/signup", json=admin_payload)
+    assert signup_response.status_code == 201
+    admin_data = signup_response.json()
+    club_id = admin_data["club_id"]
+
+    # 다른 동아리 관리자 생성 (다른 동아리)
+    other_admin_payload = {
+        "name": "Other Admin",
+        "email": "other_admin@example.com",
+        "password": "strongpassword",
+        "club_name": "Other Club",
+        "club_description": "Other club",
+    }
+    other_signup = client.post("/api/admin/signup", json=other_admin_payload)
+    assert other_signup.status_code == 201
+
+    # 다른 관리자 로그인
+    other_login = client.post(
+        "/api/auth/login",
+        json={"email": other_admin_payload["email"], "password": other_admin_payload["password"]},
+    )
+    assert other_login.status_code == 200
+    other_token = other_login.json()["tokens"]["access_token"]
+    other_headers = {"Authorization": f"Bearer {other_token}"}
+
+    # 다른 동아리 관리자가 첫 번째 동아리 수정 시도
+    update_response = client.put(
+        f"/api/clubs/{club_id}",
+        json={"name": "Hacked"},
+        headers=other_headers,
+    )
+    assert update_response.status_code == 403
+
+
+def test_delete_club_forbidden_non_admin(client):
+    """관리자가 아닌 사용자가 동아리 삭제 시 403 에러"""
+    # 관리자로 클럽 생성
+    admin_payload = {
+        "name": "Delete Forbidden Admin",
+        "email": "delete_forbidden@example.com",
+        "password": "strongpassword",
+        "club_name": "Delete Forbidden Club",
+        "club_description": "Test club",
+    }
+    signup_response = client.post("/api/admin/signup", json=admin_payload)
+    assert signup_response.status_code == 201
+    admin_data = signup_response.json()
+    club_id = admin_data["club_id"]
+
+    # 다른 동아리 관리자 생성
+    other_admin_payload = {
+        "name": "Other Delete Admin",
+        "email": "other_delete_admin@example.com",
+        "password": "strongpassword",
+        "club_name": "Other Delete Club",
+        "club_description": "Other club",
+    }
+    other_signup = client.post("/api/admin/signup", json=other_admin_payload)
+    assert other_signup.status_code == 201
+
+    # 다른 관리자 로그인
+    other_login = client.post(
+        "/api/auth/login",
+        json={"email": other_admin_payload["email"], "password": other_admin_payload["password"]},
+    )
+    assert other_login.status_code == 200
+    other_token = other_login.json()["tokens"]["access_token"]
+    other_headers = {"Authorization": f"Bearer {other_token}"}
+
+    # 다른 동아리 관리자가 첫 번째 동아리 삭제 시도
+    delete_response = client.delete(f"/api/clubs/{club_id}", headers=other_headers)
+    assert delete_response.status_code == 403
 
 
 def test_update_club_location(client):
@@ -48,8 +177,17 @@ def test_update_club_location(client):
     assert signup_response.status_code == 201
     club_id = signup_response.json()["club_id"]
 
+    # 로그인하여 토큰 획득
+    login_response = client.post(
+        "/api/auth/login",
+        json={"email": admin_payload["email"], "password": admin_payload["password"]},
+    )
+    assert login_response.status_code == 200
+    token = login_response.json()["tokens"]["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
     update_payload = {"location_lat": 3712, "location_lng": 12705}
-    update_response = client.put(f"/api/clubs/{club_id}", json=update_payload)
+    update_response = client.put(f"/api/clubs/{club_id}", json=update_payload, headers=headers)
     assert update_response.status_code == 200
     update_data = update_response.json()
     assert update_data["location_lat"] == update_payload["location_lat"]
