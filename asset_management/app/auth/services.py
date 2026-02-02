@@ -69,45 +69,134 @@ class AuthServices:
       )
     return data
 
-  def login_google(self, id_token: str):
+  def _exchange_google_code_for_tokens(self, code: str, code_verifier: str, redirect_uri: str) -> dict:
+    if not AUTH_SETTINGS.GOOGLE_CLIENT_ID:
+      raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="Google client ID not configured",
+      )
+    if not AUTH_SETTINGS.GOOGLE_CLIENT_SECRET:
+      raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="Google client secret not configured",
+      )
+
+    token_url = "https://oauth2.googleapis.com/token"
+    payload = urllib.parse.urlencode(
+      {
+        "code": code,
+        "client_id": AUTH_SETTINGS.GOOGLE_CLIENT_ID,
+        "client_secret": AUTH_SETTINGS.GOOGLE_CLIENT_SECRET,
+        "redirect_uri": redirect_uri,
+        "grant_type": "authorization_code",
+        "code_verifier": code_verifier,
+      }
+    ).encode("utf-8")
+    request = urllib.request.Request(
+      token_url,
+      data=payload,
+      headers={"Content-Type": "application/x-www-form-urlencoded"},
+      method="POST",
+    )
+    try:
+      with urllib.request.urlopen(request, timeout=5) as response:
+        data = json.loads(response.read().decode("utf-8"))
+    except Exception:
+      raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid Google authorization code",
+      )
+    if "error" in data:
+      raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Google token exchange failed",
+      )
+    return data
+
+  def login_google(self, code: str, code_verifier: str, redirect_uri: str):
+    try:
+      token_data = self._exchange_google_code_for_tokens(code, code_verifier, redirect_uri)
+    except HTTPException as exc:
+      if exc.status_code == status.HTTP_401_UNAUTHORIZED:
+        raise HTTPException(
+          status_code=status.HTTP_400_BAD_REQUEST,
+          detail=exc.detail,
+        )
+      raise
+    id_token = token_data.get("id_token")
+    if not id_token:
+      raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Google ID token missing",
+      )
     data = self._verify_google_id_token(id_token)
     email = data["email"]
 
     user = self.auth_repository.get_user_by_social_email(email)
     if not user:
-      user = self.auth_repository.get_user_by_email(email)
+      raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="Linked Google account not found",
+      )
 
     if user:
       if user.is_admin:
         raise HTTPException(
-          status_code=status.HTTP_403_FORBIDDEN,
+          status_code=status.HTTP_400_BAD_REQUEST,
           detail="Admin account cannot use social login",
         )
-      if not user.social_email:
-        user.social_email = email
-        self.auth_repository.db_session.commit()
       return {
         "user_name": user.name,
         "user_type": user.is_admin,
         "tokens": self.issue_token(user.id),
       }
 
-    name = data.get("name") or email.split("@")[0]
-    user = User(
-      name=name,
-      email=email,
-      social_email=email,
-      hashed_password=None,
-      is_admin=False,
-    )
-    self.auth_repository.db_session.add(user)
+  def link_google(self, user: User, code: str, code_verifier: str, redirect_uri: str):
+    if user.is_admin:
+      raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Admin account cannot use social login",
+      )
+    if user.social_email:
+      raise HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail="Google account already linked",
+      )
+    token_data = self._exchange_google_code_for_tokens(code, code_verifier, redirect_uri)
+    id_token = token_data.get("id_token")
+    if not id_token:
+      raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Google ID token missing",
+      )
+    data = self._verify_google_id_token(id_token)
+    email = data["email"]
+    existing = self.auth_repository.get_user_by_social_email(email)
+    if existing and existing.id != user.id:
+      raise HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail="Google account already linked",
+      )
+    other_user = self.auth_repository.get_user_by_email(email)
+    if other_user and other_user.id != user.id:
+      raise HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail="Google account already linked",
+      )
+    user.social_email = email
+    user.social_linked_at = datetime.now()
     self.auth_repository.db_session.commit()
-    self.auth_repository.db_session.refresh(user)
-    return {
-      "user_name": user.name,
-      "user_type": user.is_admin,
-      "tokens": self.issue_token(user.id),
-    }
+    return {"google_email": email, "linked_at": user.social_linked_at.isoformat()}
+
+  def unlink_google(self, user: User):
+    if not user.social_email:
+      raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="Google account not linked",
+      )
+    user.social_email = None
+    user.social_linked_at = None
+    self.auth_repository.db_session.commit()
 
   def refresh_user_token(self, refresh_token: str):
     user_id = verify_token(refresh_token, AUTH_SETTINGS.REFRESH_TOKEN_SECRET, "refresh")

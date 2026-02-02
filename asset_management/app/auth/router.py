@@ -1,15 +1,20 @@
-from datetime import datetime
 from typing import Annotated
-from fastapi import APIRouter, Depends, HTTPException, Header, status, Response
-from sqlalchemy.orm import Session
-from asset_management.app.auth.schemas import LoginResponse, UserSignin, TokenResponse, GoogleSignin
+from fastapi import APIRouter, Depends, status, Response
+from asset_management.app.auth.schemas import (
+  LoginResponse,
+  UserSignin,
+  TokenResponse,
+  GoogleAuthRequest,
+  GoogleLinkResponse,
+  GoogleStatusResponse,
+)
 from asset_management.app.auth.services import AuthServices
 from asset_management.app.auth.utils import (
-  issue_token,
-  login_with_header,
   refresh_token,
   get_header_token,
 )
+from asset_management.app.auth.dependencies import get_current_user
+from asset_management.app.user.models import User
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -24,11 +29,51 @@ def login(
   return LoginResponse(**login_info)
 
 
-@router.post("/google", status_code=status.HTTP_200_OK)
+@router.get("/google/status", status_code=status.HTTP_200_OK)
+def google_status(
+  user: Annotated[User, Depends(get_current_user)],
+) -> GoogleStatusResponse:
+  return GoogleStatusResponse(
+    is_linked=bool(user.social_email),
+    google_email=user.social_email,
+  )
+
+
+@router.post("/google/link", status_code=status.HTTP_200_OK)
+def google_link(
+  request: GoogleAuthRequest,
+  auth_service: Annotated[AuthServices, Depends()],
+  user: Annotated[User, Depends(get_current_user)],
+) -> GoogleLinkResponse:
+  link_info = auth_service.link_google(
+    user,
+    request.code,
+    request.code_verifier,
+    request.redirect_uri,
+  )
+  return GoogleLinkResponse(**link_info)
+
+
+@router.delete("/google/link", status_code=status.HTTP_204_NO_CONTENT)
+def google_unlink(
+  auth_service: Annotated[AuthServices, Depends()],
+  user: Annotated[User, Depends(get_current_user)],
+):
+  auth_service.unlink_google(user)
+  response = Response()
+  response.status_code = status.HTTP_204_NO_CONTENT
+  return response
+
+
+@router.post("/google/login", status_code=status.HTTP_200_OK)
 def google_login(
-  request: GoogleSignin, auth_service: Annotated[AuthServices, Depends()]
+  request: GoogleAuthRequest, auth_service: Annotated[AuthServices, Depends()]
 ) -> LoginResponse:
-  login_info = auth_service.login_google(request.id_token)
+  login_info = auth_service.login_google(
+    request.code,
+    request.code_verifier,
+    request.redirect_uri,
+  )
   return LoginResponse(**login_info)
 
 

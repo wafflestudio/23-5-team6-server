@@ -5,6 +5,8 @@ class AuthSettings(BaseSettings):
     ACCESS_TOKEN_SECRET: str
     REFRESH_TOKEN_SECRET: str
     GOOGLE_CLIENT_ID: str | None = None
+    GOOGLE_CLIENT_SECRET: str | None = None
+    GOOGLE_REDIRECT_URI: str | None = None
     SHORT_SESSION_LIFESPAN: int = 15
     LONG_SESSION_LIFESPAN: int = 24 * 60
 

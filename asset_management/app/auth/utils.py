@@ -1,6 +1,7 @@
 from asset_management.app.auth.repositories import AuthRepository
 from asset_management.app.auth.settings import AUTH_SETTINGS
 from datetime import datetime, timedelta
+import uuid
 from authlib.jose import jwt
 from authlib.jose.errors import JoseError
 from fastapi import Depends, Header, HTTPException, status
@@ -15,11 +16,13 @@ def issue_token(user_id: int) -> str:
     "sub": user_id,
     "type": "access",
     "exp": datetime.now() + timedelta(minutes=AUTH_SETTINGS.SHORT_SESSION_LIFESPAN),
+    "jti": str(uuid.uuid4()),
   }
   payload_ref = {
     "sub": user_id,
     "type": "refresh",
     "exp": datetime.now() + timedelta(minutes=AUTH_SETTINGS.LONG_SESSION_LIFESPAN),
+    "jti": str(uuid.uuid4()),
   }
   access_token = jwt.encode(header, payload_acc, AUTH_SETTINGS.ACCESS_TOKEN_SECRET)
   refresh_token = jwt.encode(header, payload_ref, AUTH_SETTINGS.REFRESH_TOKEN_SECRET)

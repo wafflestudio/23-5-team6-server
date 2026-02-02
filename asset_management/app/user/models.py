@@ -1,6 +1,7 @@
 import uuid
+from datetime import datetime
 from typing import List, Optional, TYPE_CHECKING
-from sqlalchemy import String, Integer, ForeignKey
+from sqlalchemy import String, Integer, ForeignKey, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from asset_management.database.common import Base
 
@@ -26,6 +27,7 @@ class User(Base):
     email: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
     hashed_password: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     social_email: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
+    social_linked_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     is_admin: Mapped[bool] = mapped_column(nullable=False, default=False)
     student_id: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
 
