@@ -20,6 +20,15 @@ class Club(Base):
     location_lng: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     # Relationships
-    user_clublists: Mapped[List["UserClublist"]] = relationship(back_populates="club")
-    assets: Mapped[List["Asset"]] = relationship(back_populates="club")
-    schedules: Mapped[List["Schedule"]] = relationship(back_populates="club")
+    user_clublists: Mapped[List["UserClublist"]] = relationship(
+        back_populates="club",
+        cascade="all, delete-orphan"
+    )
+    assets: Mapped[List["Asset"]] = relationship(
+        back_populates="club",
+        cascade="all, delete-orphan"
+    )
+    schedules: Mapped[List["Schedule"]] = relationship(
+        back_populates="club",
+        cascade="all, delete-orphan"
+    )
