@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Body, Depends, status
+from fastapi import APIRouter, Body, Depends, status, UploadFile, File, Form
 from fastapi import Depends as FastAPIDepends
 
 from asset_management.app.assets.repositories import AssetRepository
@@ -9,7 +9,6 @@ from asset_management.app.auth.utils import login_with_header
 from asset_management.app.club_member.services import ClubMemberService
 from asset_management.app.rental.schemas import (
     RentalBorrowRequest,
-    RentalReturnRequest,
     RentalResponse,
 )
 from asset_management.app.rental.services import RentalService
@@ -32,21 +31,24 @@ def borrow_item(
 
 
 @router.post("/{rental_id}/return", status_code=status.HTTP_200_OK)
-def return_item(
+async def return_item(
     rental_id: int,
     rental_service: Annotated[RentalService, Depends()],
     user_id: str = Depends(login_with_header),
-    request: Optional[RentalReturnRequest] = Body(default=None),
+    location_lat: int | None = Form(None),
+    location_lng: int | None = Form(None),
+    file: Optional[UploadFile] = File(...),
+    # request: Optional[RentalReturnRequest] = Depends(),
+    # json이 아니라 form-data로 받기 때문에 RentalReturnRequest 사용 불가
 ) -> RentalResponse:
     """물품 반납
     
     대여한 물품을 반납합니다.
     """
-    location_lat = request.location_lat if request else None
-    location_lng = request.location_lng if request else None
-    return rental_service.return_item(
+    return await rental_service.return_item(
         rental_id=rental_id,
         user_id=user_id,
         location_lat=location_lat,
         location_lng=location_lng,
+        file=file,
     )

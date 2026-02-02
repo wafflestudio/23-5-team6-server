@@ -23,6 +23,7 @@ class Asset(Base):
     available_quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     location: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=func.now())
+    max_rental_days: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=None)
 
     club_id: Mapped[int] = mapped_column(ForeignKey("club.id"), nullable=False)
     category_id: Mapped[Optional[int]] = mapped_column(ForeignKey("category.id"), nullable=True)

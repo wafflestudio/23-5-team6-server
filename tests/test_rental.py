@@ -2,6 +2,9 @@ import pytest
 from fastapi.testclient import TestClient
 from datetime import date, timedelta
 
+def _return_image_file():
+    return {"file": ("return.jpg", b"fake-image-bytes", "image/jpeg")}
+
 
 @pytest.fixture(scope="function")
 def admin_club(client, db_session):
@@ -207,6 +210,27 @@ def user_in_club_with_location(
     return test_user_location
 
 
+@pytest.fixture(scope="function")
+def test_asset_with_max_rental_days(client, admin_token, admin_club):
+    """Create a test asset with max_rental_days"""
+    asset_payload = {
+        "name": "Test Camera (Max Days)",
+        "description": "Canon EOS R5",
+        "category_id": None,
+        "quantity": 3,
+        "location": "Storage Room A",
+        "club_id": admin_club["club_id"],
+        "max_rental_days": 1,
+    }
+    response = client.post(
+        "/api/admin/assets",
+        json=asset_payload,
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code == 201, f"Failed to create asset: {response.text}"
+    return response.json()
+
+
 def test_borrow_item_success(client, user_token, test_asset, user_in_club):
     """Test successful item borrowing"""
     tomorrow = date.today() + timedelta(days=1)
@@ -324,6 +348,7 @@ def test_return_item_success(client, user_token, test_asset, user_in_club):
     # Then return it
     response = client.post(
         f"/api/rentals/{rental_id}/return",
+        files=_return_image_file(),
         headers={"Authorization": f"Bearer {user_token}"},
     )
     
@@ -353,6 +378,7 @@ def test_return_requires_location_when_club_has_location(
 
     response = client.post(
         f"/api/rentals/{rental_id}/return",
+        files=_return_image_file(),
         headers={"Authorization": f"Bearer {user_token_location}"},
     )
     assert response.status_code == 400
@@ -379,10 +405,11 @@ def test_return_with_location_within_radius_success(
 
     response = client.post(
         f"/api/rentals/{rental_id}/return",
-        json={
-            "location_lat": admin_club_with_location["location_lat"],
-            "location_lng": admin_club_with_location["location_lng"],
+        data={
+            "location_lat": str(admin_club_with_location["location_lat"]),
+            "location_lng": str(admin_club_with_location["location_lng"]),
         },
+        files=_return_image_file(),
         headers={"Authorization": f"Bearer {user_token_location}"},
     )
     assert response.status_code == 200
@@ -392,6 +419,7 @@ def test_return_nonexistent_rental(client, user_token):
     """Test returning non-existent rental"""
     response = client.post(
         "/api/rentals/99999/return",
+        files=_return_image_file(),
         headers={"Authorization": f"Bearer {user_token}"},
     )
     
@@ -429,6 +457,7 @@ def test_return_other_users_rental(
     # Regular user tries to return admin's rental
     response = client.post(
         f"/api/rentals/{rental_id}/return",
+        files=_return_image_file(),
         headers={"Authorization": f"Bearer {user_token}"},
     )
     
@@ -453,6 +482,7 @@ def test_return_already_returned_item(client, user_token, test_asset, user_in_cl
     # Return it once
     first_return = client.post(
         f"/api/rentals/{rental_id}/return",
+        files=_return_image_file(),
         headers={"Authorization": f"Bearer {user_token}"},
     )
     assert first_return.status_code == 200
@@ -460,6 +490,7 @@ def test_return_already_returned_item(client, user_token, test_asset, user_in_cl
     # Try to return again
     second_return = client.post(
         f"/api/rentals/{rental_id}/return",
+        files=_return_image_file(),
         headers={"Authorization": f"Bearer {user_token}"},
     )
     
@@ -467,10 +498,19 @@ def test_return_already_returned_item(client, user_token, test_asset, user_in_cl
     assert "이미 반납된 물품" in second_return.json()["detail"]
 
 
-def test_return_without_auth(client):
+def test_return_without_auth(client, user_token, test_asset, user_in_club):
     """Test returning without authentication"""
+    borrow_response = client.post(
+        "/api/rentals/borrow",
+        json={"item_id": test_asset["id"]},
+        headers={"Authorization": f"Bearer {user_token}"},
+    )
+    assert borrow_response.status_code == 201
+    rental_id = borrow_response.json()["id"]
+
     response = client.post(
-        "/api/rentals/rental-001/return",
+        f"/api/rentals/{rental_id}/return",
+        files=_return_image_file(),
     )
     
     assert response.status_code == 401
@@ -531,6 +571,7 @@ def test_quantity_increases_on_return(
     # Return the item
     return_response = client.post(
         f"/api/rentals/{rental_id}/return",
+        files=_return_image_file(),
         headers={"Authorization": f"Bearer {user_token}"},
     )
     assert return_response.status_code == 200
@@ -586,3 +627,56 @@ def test_multiple_borrows_same_item(client, user_token, test_asset, user_in_club
         assert second_borrow.json()["user_id"] == another_user_id
     else:
         assert second_borrow.status_code == 400
+
+def test_borrow_item_exceeds_max_rental_days_fails(
+    client,
+    user_token,
+    test_asset_with_max_rental_days,
+    user_in_club,
+):
+    """Test borrowing fails when expected_return_date exceeds asset.max_rental_days"""
+    # max_rental_days = 1 인 자산에 대해 2일 뒤 반납을 요청하면 초과
+    day_after_tomorrow = date.today() + timedelta(days=2)
+
+    payload = {
+        "item_id": test_asset_with_max_rental_days["id"],
+        "expected_return_date": day_after_tomorrow.isoformat(),
+    }
+
+    response = client.post(
+        "/api/rentals/borrow",
+        json=payload,
+        headers={"Authorization": f"Bearer {user_token}"},
+    )
+
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert detail["code"] == "최대 대여 일수 초과"
+    assert detail["max_rental_days"] == 1
+    assert detail["requested_days"] == 3  # 오늘~2일뒤 = 3일 (inclusive)
+
+def test_borrow_item_within_max_rental_days_success(
+    client,
+    user_token,
+    test_asset_with_max_rental_days,
+    user_in_club,
+):
+    """Test borrowing succeeds when expected_return_date is within max_rental_days"""
+    today = date.today()
+
+    payload = {
+        "item_id": test_asset_with_max_rental_days["id"],
+        "expected_return_date": today.isoformat(),
+    }
+
+    response = client.post(
+        "/api/rentals/borrow",
+        json=payload,
+        headers={"Authorization": f"Bearer {user_token}"},
+    )
+
+    assert response.status_code == 201
+    data = response.json()
+    assert data["item_id"] == test_asset_with_max_rental_days["id"]
+    assert data["status"] == "borrowed"
+    assert data["expected_return_date"] == today.isoformat()

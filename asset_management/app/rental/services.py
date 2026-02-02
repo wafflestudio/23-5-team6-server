@@ -1,7 +1,7 @@
 from typing import Annotated, Optional
 import math
 from datetime import datetime, date
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, UploadFile
 from asset_management.app.schedule.repositories import ScheduleRepository
 from asset_management.app.schedule.models import Schedule, Status
 from asset_management.app.assets.repositories import AssetRepository
@@ -9,6 +9,7 @@ from asset_management.app.club.models import Club
 from asset_management.app.assets.models import Asset
 from asset_management.app.rental.schemas import RentalResponse
 from asset_management.database.session import get_session
+from asset_management.app.picture.models import Picture
 from sqlalchemy.orm import Session
 from sqlalchemy import update
 
@@ -58,6 +59,36 @@ class RentalService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="존재하지 않는 물품 ID",
             )
+        
+        borrowed_at = datetime.now()
+
+        if expected_return_date is not None:
+            if expected_return_date < borrowed_at.date():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="반납 예정일은 대여일 이후여야 합니다",
+                )
+            
+            expected_end = datetime.combine(
+                expected_return_date,
+                datetime.max.time()
+            )
+            rental_days = (expected_end.date() - borrowed_at.date()).days + 1
+            end_date = expected_end
+        else:
+            rental_days = asset.max_rental_days if asset.max_rental_days is not None else -1
+            end_date = borrowed_at
+
+        if asset.max_rental_days is not None:
+            if rental_days > asset.max_rental_days:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={
+                        "code": "최대 대여 일수 초과",
+                        "max_rental_days": asset.max_rental_days,
+                        "requested_days": rental_days,
+                    },
+                )
 
         # 대여 가능 수량 확인 및 감소 (낙관적 락)
         result = self.db_session.execute(
@@ -74,9 +105,6 @@ class RentalService:
             )
 
 
-        # Schedule 생성 (borrowed 상태)
-        borrowed_at = datetime.now()
-        end_date = datetime.combine(expected_return_date, datetime.max.time()) if expected_return_date else datetime.now()
         
         schedule = Schedule(
             start_date=borrowed_at,
@@ -94,10 +122,11 @@ class RentalService:
 
         return self._schedule_to_rental(schedule)
 
-    def return_item(
+    async def return_item(
         self,
         rental_id: int,
         user_id: str,
+        file: Optional[UploadFile] = None,
         location_lat: Optional[int] = None,
         location_lng: Optional[int] = None,
     ) -> RentalResponse:
@@ -152,35 +181,71 @@ class RentalService:
                     detail="반납 위치가 동아리 위치 반경 15m 밖입니다",
                 )
 
+        # 이미지 파일 검증
+        if file is not None:
+            if file.content_type not in {"image/jpeg", "image/png", "image/webp"}:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Unsupported image type"
+                )
+        
+        data = await file.read() if file is not None else None
+        if data is not None and len(data) > 5 * 1024 * 1024:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="File too large"
+            )
+
         # 반납 처리
         returned_at = datetime.now()
         
-        # 낙관적 락으로 반납 상태 업데이트
-        result = self.db_session.execute(
-            update(Schedule)
-            .where(
-                Schedule.id == rental_id,
-                Schedule.user_id == user_id,
-                Schedule.status == Status.IN_USE.value,
-            )
-            .values(status=Status.RETURNED.value, end_date=returned_at)
-        )
 
-        if result.rowcount == 0:
-            self.db_session.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="이미 반납되었거나 반납할 수 없는 상태",
+        try:
+            new_picture = Picture(
+                asset_id=schedule.asset_id,
+                is_main=False,
+                user_id=user_id,
+                data=data,
+                content_type=file.content_type if file is not None else None,
+                filename=file.filename if file is not None else "upload",
+                size=len(data) if data is not None else 0            
             )
 
-        self.db_session.execute(
-            update(Asset)
-            .where(Asset.id == schedule.asset_id)
-            .values(available_quantity=Asset.available_quantity + 1)
-        )
+            self.db_session.add(new_picture)
+            self.db_session.flush()
 
+            # 낙관적 락으로 반납 상태 업데이트
+            result = self.db_session.execute(
+                update(Schedule)
+                .where(
+                    Schedule.id == rental_id,
+                    Schedule.user_id == user_id,
+                    Schedule.status == Status.IN_USE.value,
+                )
+                .values(
+                    status=Status.RETURNED.value,
+                    end_date=returned_at,
+                    return_picture_id=new_picture.id if file is not None else None
+                    )
+            )
+
+            if result.rowcount == 0:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="이미 반납되었거나 반납할 수 없는 상태",
+                )
+
+            self.db_session.execute(
+                update(Asset)
+                .where(Asset.id == schedule.asset_id)
+                .values(available_quantity=Asset.available_quantity + 1)
+            )
+            self.db_session.commit()
         
-        self.db_session.commit()
+        except Exception as e:
+            self.db_session.rollback()
+            raise e
+        
         schedule = self.db_session.query(Schedule).filter(Schedule.id == rental_id).first()
 
         return self._schedule_to_rental(schedule)

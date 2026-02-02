@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 from sqlalchemy import Integer, DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from asset_management.database.common import Base
@@ -28,6 +28,7 @@ class Schedule(Base):
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("user.id"), nullable=False)
     club_id: Mapped[int] = mapped_column(ForeignKey("club.id"), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default=Status.PENDING.value) 
+    return_picture_id: Mapped[Optional[int]] = mapped_column(ForeignKey("picture.id"), nullable=True)
 
     # Relationships
     asset: Mapped["Asset"] = relationship(back_populates="schedules")

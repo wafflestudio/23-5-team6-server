@@ -27,10 +27,10 @@ class AssetService:
             description=asset_request.description,
             club_id=admin_club_id,
             category_id=asset_request.category_id,
-            # category_name=CategoryService.get_category_by_id(asset_request.category_id).name,
             total_quantity=asset_request.quantity,
             available_quantity=asset_request.quantity,
             location=asset_request.location,
+            max_rental_days=asset_request.max_rental_days,
         )
 
         self.asset_repository.create_asset(new_asset)
@@ -47,6 +47,7 @@ class AssetService:
             available_quantity=new_asset.available_quantity,
             location=new_asset.location,
             created_at=new_asset.created_at,
+            max_rental_days=new_asset.max_rental_days,
         )
 
     def update_asset_for_admin(
@@ -66,6 +67,7 @@ class AssetService:
             total_quantity=asset_request.quantity,
             available_quantity=asset_request.quantity,
             location=asset_request.location,
+            max_rental_days=asset_request.max_rental_days,
         )
 
         return AssetResponse(
@@ -79,6 +81,7 @@ class AssetService:
             available_quantity=updated_asset.available_quantity,
             location=updated_asset.location,
             created_at=updated_asset.created_at,
+            max_rental_days=updated_asset.max_rental_days,
         )
 
     def delete_asset_for_admin(self, asset_id: int) -> None:
@@ -104,6 +107,7 @@ class AssetService:
                 available_quantity=asset.available_quantity,
                 location=asset.location,
                 created_at=asset.created_at,
+                max_rental_days=asset.max_rental_days,
             )
             for asset in assets
         ]
