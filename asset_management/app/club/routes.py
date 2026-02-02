@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from asset_management.app.auth.dependencies import get_current_user
+from asset_management.app.auth.utils import login_with_header
 from asset_management.app.club.models import Club
 from asset_management.app.club.schemas import ClubResponse, ClubUpdate
 from asset_management.app.user.models import User, UserClublist
@@ -38,17 +39,35 @@ def get_club(club_id: int, session: Session = Depends(get_session)):
     return club
 
 
+def _check_club_admin(session: Session, user_id: str, club_id: int) -> bool:
+    """사용자가 해당 동아리의 관리자인지 확인"""
+    membership = session.query(UserClublist).filter(
+        UserClublist.user_id == user_id,
+        UserClublist.club_id == club_id,
+        UserClublist.permission == 1  # 관리자
+    ).first()
+    return membership is not None
+
+
 @router.put(
     "/{club_id}",
     response_model=ClubResponse,
     summary="Update a club",
 )
 def update_club(
-    club_id: int, payload: ClubUpdate, session: Session = Depends(get_session)
+    club_id: int,
+    payload: ClubUpdate,
+    user_id: str = Depends(login_with_header),
+    session: Session = Depends(get_session),
 ):
+    """동아리 정보 수정 (관리자만 가능)"""
     club = session.query(Club).filter(Club.id == club_id).first()
     if not club:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Club not found")
+
+    # 관리자 권한 체크
+    if not _check_club_admin(session, user_id, club_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="관리자만 동아리 정보를 수정할 수 있습니다")
 
     if payload.name is not None:
         club.name = payload.name
@@ -70,14 +89,19 @@ def update_club(
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete a club",
 )
-def delete_club(club_id: int, session: Session = Depends(get_session)):
+def delete_club(
+    club_id: int,
+    user_id: str = Depends(login_with_header),
+    session: Session = Depends(get_session),
+):
+    """동아리 삭제 (관리자만 가능) - 연관된 모든 데이터도 함께 삭제됩니다"""
     club = session.query(Club).filter(Club.id == club_id).first()
-    club_members = session.query(UserClublist).filter(UserClublist.club_id == club_id).all()
-    for member in club_members:
-        session.delete(member)
     if not club:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Club not found")
 
+    # 관리자 권한 체크
+    if not _check_club_admin(session, user_id, club_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="관리자만 동아리를 삭제할 수 있습니다")
     session.delete(club)
     session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
