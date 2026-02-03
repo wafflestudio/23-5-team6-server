@@ -7,7 +7,12 @@ from authlib.jose.errors import JoseError
 from fastapi import Depends, Header, HTTPException, status
 from typing import Annotated
 import hashlib
+from argon2 import PasswordHasher
+from argon2.exceptions import VerifyMismatchError, InvalidHashError
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
+# Argon2 password hasher
+ph = PasswordHasher()
 
 
 def issue_token(user_id: int) -> str:
@@ -66,7 +71,22 @@ def refresh_token(token: Annotated[str | None, Depends(get_header_token)] = None
   return verify_token(token, AUTH_SETTINGS.REFRESH_TOKEN_SECRET, "refresh")
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-  return hashlib.sha256(plain_password.encode("utf-8")).hexdigest() == hashed_password
+  """비밀번호 검증 (argon2 및 레거시 SHA-256 지원)"""
+  # argon2 해시는 "$argon2"로 시작
+  if hashed_password.startswith("$argon2"):
+    try:
+      ph.verify(hashed_password, plain_password)
+      return True
+    except (VerifyMismatchError, InvalidHashError):
+      return False
+  else:
+    # 기존 SHA-256 (마이그레이션 대상)
+    return hashlib.sha256(plain_password.encode("utf-8")).hexdigest() == hashed_password
+
+
+def needs_password_migration(hashed_password: str) -> bool:
+  """비밀번호가 argon2로 마이그레이션이 필요한지 확인"""
+  return not hashed_password.startswith("$argon2")
 
 def check_club_permission(user_club_id: int, resource_club_id: int, auth_repository: Annotated[AuthRepository, Depends()]) -> int:
   """Check if the user has permission for the club resource.
@@ -92,7 +112,7 @@ def check_club_permission(user_club_id: int, resource_club_id: int, auth_reposit
   return userclubinfo.permission
 
 def hash_password(password: str) -> str:
-  """Hash the password using SHA-256.
+  """Hash the password using Argon2.
   
   Args:
       password (str): The plain text password.
@@ -100,4 +120,4 @@ def hash_password(password: str) -> str:
   Returns:
       str: The hashed password.
   """
-  return hashlib.sha256(password.encode("utf-8")).hexdigest()
+  return ph.hash(password)

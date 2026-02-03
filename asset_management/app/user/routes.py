@@ -1,18 +1,12 @@
-import hashlib
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from asset_management.app.user.models import User
 from asset_management.app.user.schemas import UserCreate, UserResponse
+from asset_management.app.auth.utils import hash_password
 from asset_management.database.session import get_session
 
 router = APIRouter(prefix="/users", tags=["users"])
-
-
-def _hash_password(raw_password: str) -> str:
-    # Simple SHA-256 hash; replace with stronger hashing (bcrypt/argon2) in production.
-    return hashlib.sha256(raw_password.encode("utf-8")).hexdigest()
 
 
 @router.post(
@@ -32,7 +26,7 @@ def signup(payload: UserCreate, session: Session = Depends(get_session)):
     user = User(
         name=payload.name,
         email=payload.email,
-        hashed_password=_hash_password(payload.password),
+        hashed_password=hash_password(payload.password),
     )
     session.add(user)
     session.commit()
