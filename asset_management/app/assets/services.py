@@ -170,24 +170,41 @@ class AssetService:
         # 헤더 행 가져오기 (첫 번째 행)
         headers = [cell.value for cell in ws[1]]
         
+        # 배치 처리를 위한 리스트
+        assets_to_create = []
+        batch_size = 1000  # 1000개씩 배치 처리
+        
         # 데이터 행 처리 (2번째 행부터)
         for row in ws.iter_rows(min_row=2, values_only=True):
             if not any(row):  # 빈 행 건너뛰기
                 continue
             try:
                 row_dict = dict(zip(headers, row))
-                self.asset_repository.create_asset(Asset(
-                    name=str(row_dict["name"]),
-                    description=str(row_dict["description"]) if row_dict["description"] else "",
-                    total_quantity=int(row_dict["total_quantity"]),
-                    available_quantity=int(row_dict["available_quantity"]),
-                    location=str(row_dict["location"]) if row_dict["location"] else "",
-                    created_at=datetime.strptime(str(row_dict["created_at"]), "%Y-%m-%d %H:%M:%S"),
+                asset = Asset(
+                    name=str(row_dict.get("name") or row_dict.get("물품명") or ""),
+                    description=str(row_dict.get("description") or row_dict.get("설명") or ""),
+                    total_quantity=int(row_dict.get("total_quantity") or row_dict.get("전체수량") or 0),
+                    available_quantity=int(row_dict.get("available_quantity") or row_dict.get("사용가능수량") or 0),
+                    location=str(row_dict.get("location") or row_dict.get("위치") or ""),
+                    created_at=datetime.strptime(str(row_dict.get("created_at") or row_dict.get("등록일")), "%Y-%m-%d %H:%M:%S"),
                     club_id=club_id
-                ))
-                imported_count += 1
+                )
+                assets_to_create.append(asset)
+                
+                # 배치 크기에 도달하면 DB에 저장
+                if len(assets_to_create) >= batch_size:
+                    self.asset_repository.bulk_create_assets(assets_to_create)
+                    imported_count += len(assets_to_create)
+                    assets_to_create = []
+                    
             except Exception as e:
                 failed.append({"row": row_dict if 'row_dict' in locals() else row, "error": str(e)})
+        
+        # 남은 자산들 저장
+        if assets_to_create:
+            self.asset_repository.bulk_create_assets(assets_to_create)
+            imported_count += len(assets_to_create)
+            
         return {"imported": imported_count, "failed": failed}
         
         

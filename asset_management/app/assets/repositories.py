@@ -19,6 +19,12 @@ class AssetRepository:
         self.session.refresh(asset)
         return asset
     
+    def bulk_create_assets(self, assets: list[Asset]) -> int:
+        """여러 자산을 한 번에 생성 (bulk insert)"""
+        self.session.add_all(assets)
+        self.session.commit()
+        return len(assets)
+    
     def get_asset_by_id(self, asset_id: int) -> Asset | None:
         assetLoc = select(Asset).where(Asset.id == asset_id)
         return self.session.scalar(assetLoc)
