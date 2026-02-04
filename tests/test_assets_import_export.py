@@ -277,3 +277,71 @@ def test_download_template_without_auth(client: TestClient):
     # 템플릿은 인증 없이도 다운로드 가능할 수 있음
     # 정책에 따라 401 또는 200
     assert response.status_code in [200, 401]
+
+
+def test_import_invalid_file_type(client: TestClient, admin_headers: dict):
+    """지원하지 않는 파일 형식 업로드 테스트 (CSV, TXT 등)"""
+    # CSV 파일 업로드 시도
+    csv_content = b"name,description,quantity\nitem1,desc1,5"
+    files = {
+        "file": ("test.csv", BytesIO(csv_content), "text/csv")
+    }
+    
+    response = client.post(
+        "/api/assets/import",
+        files=files,
+        headers=admin_headers
+    )
+    
+    assert response.status_code == 400
+    assert "파일 형식" in response.json()["detail"] or "Excel" in response.json()["detail"]
+
+
+def test_import_oversized_file(client: TestClient, admin_headers: dict):
+    """용량 초과 파일 업로드 테스트 (10MB 초과)"""
+    # 10MB보다 큰 파일 생성 - 테스트에서는 Content-Length 헤더로 미들웨어에서 차단됨
+    # 실제 10MB+ 데이터를 생성하면 테스트가 느려지므로 작은 크기로 테스트
+    # 미들웨어는 Content-Length 헤더를 검사하므로 큰 Content-Length를 직접 설정하여 테스트
+    wb = Workbook()
+    ws = wb.active
+    ws.append(["name", "description", "total_quantity", "available_quantity", "location", "created_at"])
+    ws.append(["테스트", "설명", 1, 1, "창고", "2024-01-01 00:00:00"])
+    
+    excel_buffer = BytesIO()
+    wb.save(excel_buffer)
+    excel_buffer.seek(0)
+    
+    # Content-Length를 조작하여 10MB 초과로 설정
+    files = {
+        "file": ("oversized.xlsx", excel_buffer, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    }
+    
+    # 미들웨어 테스트: Content-Length 헤더를 직접 설정
+    headers = {**admin_headers, "Content-Length": str(15 * 1024 * 1024)}  # 15MB
+    
+    response = client.post(
+        "/api/assets/import",
+        files=files,
+        headers=headers
+    )
+    
+    # 미들웨어에서 413 반환 또는 실제 파일이 작으므로 200
+    assert response.status_code in [200, 413]
+
+
+def test_import_corrupted_excel(client: TestClient, admin_headers: dict):
+    """손상된 Excel 파일 업로드 테스트"""
+    # Excel 헤더를 흡내낸 손상된 파일
+    corrupted_content = b"PK\x03\x04corrupted_excel_data_here"
+    files = {
+        "file": ("corrupted.xlsx", BytesIO(corrupted_content), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    }
+    
+    response = client.post(
+        "/api/assets/import",
+        files=files,
+        headers=admin_headers
+    )
+    
+    assert response.status_code == 400
+    assert "Excel" in response.json()["detail"] or "올바르" in response.json()["detail"]

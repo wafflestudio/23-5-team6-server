@@ -17,13 +17,25 @@ class PictureService:
         self, user_id: int, file: UploadFile, picture_request: PictureCreateRequest
     ) -> PictureResponse:
         
-        data = await file.read()
-
+        # 파일 형식 검증 (먼저 체크)
         if file.content_type not in {"image/jpeg", "image/png", "image/webp"}:
             raise HTTPException(status_code=400, detail="Unsupported image type")
-
-        if len(data) > 5 * 1024 * 1024:
-            raise HTTPException(status_code=400, detail="File too large")
+        
+        # 파일 크기 검증 (5MB 제한) - 청크 단위로 읽기
+        max_size = 5 * 1024 * 1024  # 5MB
+        chunks = []
+        total_size = 0
+        
+        while True:
+            chunk = await file.read(8192)  # 8KB씩 읽기
+            if not chunk:
+                break
+            total_size += len(chunk)
+            if total_size > max_size:
+                raise HTTPException(status_code=400, detail="File too large")
+            chunks.append(chunk)
+        
+        data = b''.join(chunks)
 
         if picture_request.is_main:
             self.picture_repository.clear_main_picture_by_asset(picture_request.asset_id)

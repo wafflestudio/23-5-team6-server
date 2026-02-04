@@ -189,12 +189,26 @@ class RentalService:
                     detail="Unsupported image type"
                 )
         
-        data = await file.read() if file is not None else None
-        if data is not None and len(data) > 5 * 1024 * 1024:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="File too large"
-            )
+        # 파일 크기 검증 (5MB 제한) - 청크 단위로 읽기
+        data = None
+        if file is not None:
+            max_size = 5 * 1024 * 1024  # 5MB
+            chunks = []
+            total_size = 0
+            
+            while True:
+                chunk = await file.read(8192)  # 8KB씩 읽기
+                if not chunk:
+                    break
+                total_size += len(chunk)
+                if total_size > max_size:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="File too large"
+                    )
+                chunks.append(chunk)
+            
+            data = b''.join(chunks)
 
         # 반납 처리
         returned_at = datetime.now()

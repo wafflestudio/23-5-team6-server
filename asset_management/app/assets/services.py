@@ -134,9 +134,34 @@ class AssetService:
         return output.getvalue()
     
     async def import_assets_from_excel(self, club_id: int, file: UploadFile) -> dict:
-        contents = await file.read()
+        # 파일 형식 검증
+        allowed_types = [
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "application/vnd.ms-excel",
+        ]
+        if file.content_type not in allowed_types:
+            raise ValueError("지원하지 않는 파일 형식입니다. Excel 파일(.xlsx, .xls)만 업로드 가능합니다.")
         
-        wb = load_workbook(BytesIO(contents))
+        # 파일 크기 검증 (10MB 제한) - 청크 단위로 읽기
+        max_size = 10 * 1024 * 1024  # 10MB
+        chunks = []
+        total_size = 0
+        
+        while True:
+            chunk = await file.read(8192)  # 8KB씩 읽기
+            if not chunk:
+                break
+            total_size += len(chunk)
+            if total_size > max_size:
+                raise ValueError("파일 크기가 너무 큽니다. 최대 10MB까지 업로드 가능합니다.")
+            chunks.append(chunk)
+        
+        contents = b''.join(chunks)
+        
+        try:
+            wb = load_workbook(BytesIO(contents))
+        except Exception as e:
+            raise ValueError("올바른 Excel 파일이 아닙니다.") from e
         ws = wb.active
         
         failed = []
