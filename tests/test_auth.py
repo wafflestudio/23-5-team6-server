@@ -303,7 +303,7 @@ def test_change_password_wrong_current(client: TestClient, user_data, auth_token
     },
     headers={"Authorization": f"Bearer {auth_token['access_token']}"},
   )
-  assert response.status_code == 401
+  assert response.status_code == 400
   assert "현재 비밀번호가 일치하지 않습니다" in response.json()["detail"]
 
 
