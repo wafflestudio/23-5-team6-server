@@ -5,7 +5,7 @@ import urllib.parse
 import urllib.request
 from asset_management.app.auth.repositories import AuthRepository
 from asset_management.app.auth.settings import AUTH_SETTINGS
-from asset_management.app.auth.utils import issue_token, verify_password, verify_token
+from asset_management.app.auth.utils import issue_token, verify_password, verify_token, needs_password_migration, hash_password
 from fastapi import Depends, HTTPException, Header, status
 from asset_management.app.user.models import User
 
@@ -30,6 +30,12 @@ class AuthServices:
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Invalid email or password",
       )
+    
+    # SHA-256에서 argon2로 점진적 마이그레이션
+    if needs_password_migration(user.hashed_password):
+      user.hashed_password = hash_password(password)
+      self.auth_repository.db_session.commit()
+    
     user_name = user.name
     user_type = user.is_admin
     return {"user_name": user_name, "user_type": user_type, "tokens": self.issue_token(user.id)}

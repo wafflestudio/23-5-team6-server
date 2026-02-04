@@ -78,7 +78,8 @@ def test_signup_success(client, db_session):
     with db_session() as session:
         user = session.query(User).filter(User.email == payload["email"]).one()
         assert user.hashed_password != payload["password"]
-        assert len(user.hashed_password) == 64
+        # argon2 해시는 "$argon2"로 시작함
+        assert user.hashed_password.startswith("$argon2")
 
 
 def test_signup_conflict_email(client):
