@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from typing import Annotated
 
 from asset_management.app.user.models import User
-from asset_management.app.user.schemas import UserCreate, UserResponse
+from asset_management.app.user.schemas import UserCreate, UserResponse, UserUpdate
 from asset_management.app.auth.utils import hash_password
+from asset_management.app.auth.dependencies import get_current_user
 from asset_management.database.session import get_session
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -29,6 +31,24 @@ def signup(payload: UserCreate, session: Session = Depends(get_session)):
         hashed_password=hash_password(payload.password),
     )
     session.add(user)
+    session.commit()
+    session.refresh(user)
+    return user
+
+
+@router.patch(
+    "/me",
+    status_code=status.HTTP_200_OK,
+    response_model=UserResponse,
+    summary="Update current user's name",
+)
+def update_me(
+    payload: UserUpdate,
+    user: Annotated[User, Depends(get_current_user)],
+    session: Session = Depends(get_session),
+):
+    """현재 로그인한 사용자의 이름을 변경합니다."""
+    user.name = payload.name
     session.commit()
     session.refresh(user)
     return user

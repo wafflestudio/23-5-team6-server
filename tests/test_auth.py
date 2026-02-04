@@ -233,3 +233,108 @@ def test_google_login_denied_for_admin(client: TestClient, monkeypatch, db_sessi
     json={"code": "authcode", "code_verifier": "verifier", "redirect_uri": "http://localhost/callback"},
   )
   assert response.status_code == 400
+
+
+# ============ 이름 변경 테스트 ============
+
+def test_change_name_success(client: TestClient, user_data, auth_token):
+  """이름 변경 성공 테스트"""
+  new_name = "새로운이름"
+  response = client.patch(
+    "/api/users/me",
+    json={"name": new_name},
+    headers={"Authorization": f"Bearer {auth_token['access_token']}"},
+  )
+  assert response.status_code == 200
+  data = response.json()
+  assert data["name"] == new_name
+  assert data["email"] == user_data["email"]
+
+
+def test_change_name_unauthorized(client: TestClient, user_data):
+  """인증 없이 이름 변경 시도 시 실패"""
+  response = client.patch(
+    "/api/users/me",
+    json={"name": "새로운이름"},
+  )
+  assert response.status_code == 401
+
+
+def test_change_name_empty(client: TestClient, user_data, auth_token):
+  """빈 이름으로 변경 시도 시 실패"""
+  response = client.patch(
+    "/api/users/me",
+    json={"name": ""},
+    headers={"Authorization": f"Bearer {auth_token['access_token']}"},
+  )
+  assert response.status_code == 422
+
+
+# ============ 비밀번호 변경 테스트 ============
+
+def test_change_password_success(client: TestClient, user_data, auth_token):
+  """비밀번호 변경 성공 테스트"""
+  new_password = "newpassword123"
+  response = client.patch(
+    "/api/auth/password",
+    json={
+      "current_password": user_data["password"],
+      "new_password": new_password,
+    },
+    headers={"Authorization": f"Bearer {auth_token['access_token']}"},
+  )
+  assert response.status_code == 204
+
+  # 새 비밀번호로 로그인 가능한지 확인
+  login_response = client.post(
+    "/api/auth/login",
+    json={"email": user_data["email"], "password": new_password},
+  )
+  assert login_response.status_code == 200
+
+
+def test_change_password_wrong_current(client: TestClient, user_data, auth_token):
+  """현재 비밀번호가 틀린 경우 실패"""
+  response = client.patch(
+    "/api/auth/password",
+    json={
+      "current_password": "wrongpassword",
+      "new_password": "newpassword123",
+    },
+    headers={"Authorization": f"Bearer {auth_token['access_token']}"},
+  )
+  assert response.status_code == 400
+  assert "현재 비밀번호가 일치하지 않습니다" in response.json()["detail"]
+
+
+def test_change_password_unauthorized(client: TestClient, user_data):
+  """인증 없이 비밀번호 변경 시도 시 실패"""
+  response = client.patch(
+    "/api/auth/password",
+    json={
+      "current_password": user_data["password"],
+      "new_password": "newpassword123",
+    },
+  )
+  assert response.status_code == 401
+
+
+def test_change_password_old_password_invalid(client: TestClient, user_data, auth_token):
+  """비밀번호 변경 후 이전 비밀번호로 로그인 불가"""
+  new_password = "newpassword123"
+  response = client.patch(
+    "/api/auth/password",
+    json={
+      "current_password": user_data["password"],
+      "new_password": new_password,
+    },
+    headers={"Authorization": f"Bearer {auth_token['access_token']}"},
+  )
+  assert response.status_code == 204
+
+  # 이전 비밀번호로 로그인 시도
+  login_response = client.post(
+    "/api/auth/login",
+    json={"email": user_data["email"], "password": user_data["password"]},
+  )
+  assert login_response.status_code == 401

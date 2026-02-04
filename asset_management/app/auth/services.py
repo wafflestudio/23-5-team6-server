@@ -216,3 +216,35 @@ class AuthServices:
   
   def logout_user(self, refresh_token: str):
     self.auth_repository.delete_token(refresh_token)
+
+  def withdraw_user(self, user: User):
+    """회원탈퇴 - 사용자 계정 및 관련 데이터 삭제"""
+    # 관리자는 동아리 삭제를 먼저 해야 함
+    if user.is_admin:
+      # 관리 중인 동아리가 있는지 확인
+      admin_clubs = [uc for uc in user.user_clublists if uc.permission == 1]
+      if admin_clubs:
+        raise HTTPException(
+          status_code=status.HTTP_400_BAD_REQUEST,
+          detail="관리자는 동아리 삭제를 통해 탈퇴해야 합니다",
+        )
+    
+    # 사용자의 모든 refresh token 삭제
+    self.auth_repository.delete_all_user_tokens(user.id)
+    
+    # 사용자 삭제 (cascade로 UserClublist, Schedule 등 삭제)
+    self.auth_repository.db_session.delete(user)
+    self.auth_repository.db_session.commit()
+
+  def change_password(self, user: User, current_password: str, new_password: str):
+    """비밀번호 변경 - 현재 비밀번호 확인 후 새 비밀번호로 변경"""
+    # 현재 비밀번호 확인
+    if not verify_password(current_password, user.hashed_password):
+      raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="현재 비밀번호가 일치하지 않습니다.",
+      )
+    
+    # 새 비밀번호로 변경
+    user.hashed_password = hash_password(new_password)
+    self.auth_repository.db_session.commit()
