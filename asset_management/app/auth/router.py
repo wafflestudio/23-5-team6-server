@@ -7,6 +7,7 @@ from asset_management.app.auth.schemas import (
   GoogleAuthRequest,
   GoogleLinkResponse,
   GoogleStatusResponse,
+  PasswordChangeRequest,
 )
 from asset_management.app.auth.services import AuthServices
 from asset_management.app.auth.utils import (
@@ -103,8 +104,21 @@ def withdraw(
   auth_service: Annotated[AuthServices, Depends()],
   user: Annotated[User, Depends(get_current_user)],
 ):
-  """회원탈퇴 - 계정 및 관련 데이터를 삭제합니다. 관리자는 동아리 삭제를 먼저 해야 합니다."""
+  """회원탈퇴 - 계정 및 관련 데이터를 삭제합니다. 관리자는 동아리 삭제로 탈퇴해주세요"""
   auth_service.withdraw_user(user)
+  response = Response()
+  response.status_code = status.HTTP_204_NO_CONTENT
+  return response
+
+
+@router.patch("/password", status_code=status.HTTP_204_NO_CONTENT)
+def change_password(
+  request: PasswordChangeRequest,
+  auth_service: Annotated[AuthServices, Depends()],
+  user: Annotated[User, Depends(get_current_user)],
+):
+  """비밀번호 변경 - 현재 비밀번호를 확인 후 새 비밀번호로 변경합니다."""
+  auth_service.change_password(user, request.current_password, request.new_password)
   response = Response()
   response.status_code = status.HTTP_204_NO_CONTENT
   return response

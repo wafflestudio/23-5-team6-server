@@ -26,3 +26,8 @@ class LoginResponse(BaseModel):
     user_name: str
     user_type: int
     tokens: TokenResponse
+
+
+class PasswordChangeRequest(BaseModel):
+    current_password: str
+    new_password: str

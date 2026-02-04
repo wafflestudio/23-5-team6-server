@@ -94,7 +94,7 @@ def delete_club(
     user_id: str = Depends(login_with_header),
     session: Session = Depends(get_session),
 ):
-    """동아리 삭제 (관리자만 가능) - 연관된 모든 데이터 및 관리자 계정도 함께 삭제됩니다"""
+    """동아리 삭제 (관리자만 가능) - 연관된 모든 데이터도 함께 삭제됩니다"""
     club = session.query(Club).filter(Club.id == club_id).first()
     if not club:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Club not found")
