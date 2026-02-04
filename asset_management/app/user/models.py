@@ -25,7 +25,7 @@ class User(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     name: Mapped[str] = mapped_column(String(30), nullable=False)
     email: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
-    hashed_password: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    hashed_password: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     social_email: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
     social_linked_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     is_admin: Mapped[bool] = mapped_column(nullable=False, default=False)
