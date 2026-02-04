@@ -216,3 +216,22 @@ class AuthServices:
   
   def logout_user(self, refresh_token: str):
     self.auth_repository.delete_token(refresh_token)
+
+  def withdraw_user(self, user: User):
+    """회원탈퇴 - 사용자 계정 및 관련 데이터 삭제"""
+    # 관리자는 동아리 삭제를 먼저 해야 함
+    if user.is_admin:
+      # 관리 중인 동아리가 있는지 확인
+      admin_clubs = [uc for uc in user.user_clublists if uc.permission == 1]
+      if admin_clubs:
+        raise HTTPException(
+          status_code=status.HTTP_400_BAD_REQUEST,
+          detail="관리자는 동아리를 먼저 삭제해야 탈퇴할 수 있습니다.",
+        )
+    
+    # 사용자의 모든 refresh token 삭제
+    self.auth_repository.delete_all_user_tokens(user.id)
+    
+    # 사용자 삭제 (cascade로 UserClublist, Schedule 등 삭제)
+    self.auth_repository.db_session.delete(user)
+    self.auth_repository.db_session.commit()

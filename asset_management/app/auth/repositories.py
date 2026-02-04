@@ -33,6 +33,11 @@ class AuthRepository:
       self.db_session.query(RefreshToken).filter(RefreshToken.token == token).delete()
       self.db_session.commit()
     
+    def delete_all_user_tokens(self, user_id: str) -> None:
+      """사용자의 모든 refresh token 삭제"""
+      self.db_session.query(RefreshToken).filter(RefreshToken.user_id == user_id).delete()
+      self.db_session.commit()
+    
     def verify_refresh_token(self, token: str) -> bool:
       return self.db_session.query(RefreshToken).filter(RefreshToken.token == token).first() is not None
     

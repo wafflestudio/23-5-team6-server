@@ -32,11 +32,21 @@ class User(Base):
     student_id: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
 
     # Relationships
-    user_clublists: Mapped[List["UserClublist"]] = relationship(back_populates="user")
-    schedules: Mapped[List["Schedule"]] = relationship(back_populates="user")
-    favorites: Mapped[List["Favorite"]] = relationship(back_populates="user")
-    uploaded_pictures: Mapped[List["Picture"]] = relationship(back_populates="user")
-    refresh_tokens: Mapped[List["RefreshToken"]] = relationship(back_populates="user")
+    user_clublists: Mapped[List["UserClublist"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    schedules: Mapped[List["Schedule"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    favorites: Mapped[List["Favorite"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    uploaded_pictures: Mapped[List["Picture"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    refresh_tokens: Mapped[List["RefreshToken"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class UserClublist(Base):

@@ -94,7 +94,7 @@ def delete_club(
     user_id: str = Depends(login_with_header),
     session: Session = Depends(get_session),
 ):
-    """동아리 삭제 (관리자만 가능) - 연관된 모든 데이터도 함께 삭제됩니다"""
+    """동아리 삭제 (관리자만 가능) - 연관된 모든 데이터 및 관리자 계정도 함께 삭제됩니다"""
     club = session.query(Club).filter(Club.id == club_id).first()
     if not club:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Club not found")
@@ -102,6 +102,16 @@ def delete_club(
     # 관리자 권한 체크
     if not _check_club_admin(session, user_id, club_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="관리자만 동아리를 삭제할 수 있습니다")
+    
+    # 관리자 계정 찾기 (본인)
+    admin_user = session.query(User).filter(User.id == user_id).first()
+    
+    # 동아리 삭제 (cascade로 UserClublist, Asset, Schedule 등 삭제됨)
     session.delete(club)
+    
+    # 관리자 계정 삭제
+    if admin_user:
+        session.delete(admin_user)
+    
     session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

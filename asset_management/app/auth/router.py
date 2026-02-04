@@ -96,3 +96,15 @@ def logout(
   response = Response()
   response.status_code = status.HTTP_204_NO_CONTENT
   return response
+
+
+@router.delete("/withdraw", status_code=status.HTTP_204_NO_CONTENT)
+def withdraw(
+  auth_service: Annotated[AuthServices, Depends()],
+  user: Annotated[User, Depends(get_current_user)],
+):
+  """회원탈퇴 - 계정 및 관련 데이터를 삭제합니다. 관리자는 동아리 삭제를 먼저 해야 합니다."""
+  auth_service.withdraw_user(user)
+  response = Response()
+  response.status_code = status.HTTP_204_NO_CONTENT
+  return response
