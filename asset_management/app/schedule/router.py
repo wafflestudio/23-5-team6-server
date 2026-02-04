@@ -53,7 +53,7 @@ def new_schedule(
   user=Depends(login_with_header),
 ) -> ScheduleResponse:
   """대여이력 추가"""
-  return schedule_service.create_schedule(club_id, request)
+  return schedule_service.create_schedule(club_id, request, user)
 
 
 @router.put("/{schedule_id}")
@@ -66,7 +66,7 @@ def update_schedule(
   """대여이력 수정
 
   승인/반납/취소 등의 상태 변경이 가능하며, 날짜 변경 또한 가능합니다."""
-  return schedule_service.update_schedule(schedule_id, request)
+  return schedule_service.update_schedule(schedule_id, request, user)
 
 
 @router.delete("/{schedule_id}", status_code=204)

@@ -56,9 +56,12 @@ class ScheduleService:
     )
 
   def create_schedule(
-    self, club_id: int, schedule_data: ScheduleCreate
+    self, club_id: int, schedule_data: ScheduleCreate, user: str
   ) -> ScheduleResponse:
     # 중복 스케줄 체크 (선택적)
+    if not self.is_admin(user) and schedule_data.user_id != user:
+      raise HTTPException(status_code=403, detail="Not authorized to create schedule for another user")
+      
     schedule = self.repository.add_schedule(
       Schedule(club_id=club_id, **schedule_data.model_dump())
     )
@@ -72,8 +75,10 @@ class ScheduleService:
       status=schedule.status,
     )
 
-  def update_schedule(self, schedule_id: int, schedule_data: ScheduleUpdate) -> ScheduleResponse:
+  def update_schedule(self, schedule_id: int, schedule_data: ScheduleUpdate, user: str) -> ScheduleResponse:
     # 업데이트할 필드만 추출
+    if not self.is_admin(user) and schedule_data.user_id != user:
+      raise HTTPException(status_code=403, detail="Not authorized to update schedule for another user")
     update_dict = {k: v for k, v in schedule_data.model_dump().items() if v is not None}
     updated_schedule = self.repository.update_schedule(schedule_id, **update_dict)
     if not updated_schedule:
