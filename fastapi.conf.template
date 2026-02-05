@@ -19,12 +19,10 @@ server {
 
     add_header Strict-Transport-Security "max-age=31536000" always;
 
-    root /usr/share/nginx/html;
-    index index.html;
 
-    location / {
-        # SPA 라우팅 대응
-        try_files $uri $uri/ /index.html;
+    location = / {
+        return 200 'BaroBorrow API Server is running.';
+        add_header Content-Type text/plain;
     }
 
     # ===== Health (backend) =====
@@ -51,5 +49,4 @@ server {
         proxy_set_header Connection "";
         proxy_read_timeout 90s;
     }
-    
 }

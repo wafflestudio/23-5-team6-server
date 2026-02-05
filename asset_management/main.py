@@ -41,7 +41,10 @@ app.add_middleware(LimitUploadSizeMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://d1vqqxs5v1ouxk.cloudfront.net",
-                   "http://localhost:5173"],
+                   "http://localhost:5173",
+                   "https://baroborrow.p-e.kr",
+                   "https://api.baroborrow.p-e.kr",
+                   ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
