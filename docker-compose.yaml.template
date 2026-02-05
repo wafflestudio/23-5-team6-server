@@ -19,8 +19,8 @@ services:
       - 80:80
       - 443:443
     volumes:
-      - /etc/letsencrypt/live/baroborrow.p-e.kr/fullchain.pem:/etc/letsencrypt/live/baroborrow.p-e.kr/fullchain.pem:ro
-      - /etc/letsencrypt/live/baroborrow.p-e.kr/privkey.pem:/etc/letsencrypt/live/baroborrow.p-e.kr/privkey.pem:ro
+      - /etc/letsencrypt/live/${MY_DOMAIN}/fullchain.pem:/etc/letsencrypt/live/${MY_DOMAIN}/fullchain.pem:ro
+      - /etc/letsencrypt/live/${MY_DOMAIN}/privkey.pem:/etc/letsencrypt/live/${MY_DOMAIN}/privkey.pem:ro
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - ./fastapi.conf:/etc/nginx/conf.d/fastapi.conf:ro
       - ./dist:/usr/share/nginx/html:ro
