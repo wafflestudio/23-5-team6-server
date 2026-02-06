@@ -16,7 +16,7 @@ class RentalResponse(BaseModel):
     id: int  # schedule id
     item_id: int
     user_id: str
-    status: str  # borrowed, returned, overdue
+    status: str  # in_use, returned, overdue
     borrowed_at: datetime
     expected_return_date: Optional[date] = None
     returned_at: Optional[datetime] = None
