@@ -221,18 +221,21 @@ class RentalService:
         
 
         try:
-            new_picture = Picture(
-                asset_id=schedule.asset_id,
-                is_main=False,
-                user_id=user_id,
-                data=data,
-                content_type=file.content_type if file is not None else None,
-                filename=file.filename if file is not None else "upload",
-                size=len(data) if data is not None else 0            
-            )
+            return_picture_id = None
+            if file is not None:
+                new_picture = Picture(
+                    asset_id=schedule.asset_id,
+                    is_main=False,
+                    user_id=user_id,
+                    data=data,
+                    content_type=file.content_type,
+                    filename=file.filename or "upload",
+                    size=len(data) if data is not None else 0,
+                )
 
-            self.db_session.add(new_picture)
-            self.db_session.flush()
+                self.db_session.add(new_picture)
+                self.db_session.flush()
+                return_picture_id = new_picture.id
 
             # 낙관적 락으로 반납 상태 업데이트
             result = self.db_session.execute(
@@ -245,7 +248,7 @@ class RentalService:
                 .values(
                     status=Status.RETURNED.value,
                     end_date=returned_at,
-                    return_picture_id=new_picture.id if file is not None else None
+                    return_picture_id=return_picture_id,
                     )
             )
 

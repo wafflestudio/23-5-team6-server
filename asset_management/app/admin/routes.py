@@ -359,6 +359,11 @@ def add_asset(
         UserClublist.user_id == current_user.id,
         UserClublist.permission == UserPermission.ADMIN.value
     ).first()
+    if not admin_club:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Admin club not found"
+        )
 
     return asset_service.create_asset_for_admin(admin_club.club_id, asset)
     
@@ -383,6 +388,11 @@ def update_asset(
         UserClublist.user_id == current_user.id,
         UserClublist.permission == UserPermission.ADMIN.value
     ).first()
+    if not admin_club:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Admin club not found"
+        )
 
     return asset_service.update_asset_for_admin(admin_club.club_id, asset_id, asset)
 
@@ -391,6 +401,7 @@ def delete_asset(
     asset_id: int,
     current_user: Annotated[User, Depends(get_current_user)],
     asset_service: Annotated[AssetService, Depends()],
+    session: Session = Depends(get_session),
 ):
     # Check if user is admin
     if not current_user.is_admin:
@@ -398,9 +409,18 @@ def delete_asset(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin access required"
         )
-    
-    
-    return asset_service.delete_asset_for_admin(asset_id)
+    # Get admin's club
+    admin_club = session.query(UserClublist).filter(
+        UserClublist.user_id == current_user.id,
+        UserClublist.permission == UserPermission.ADMIN.value
+    ).first()
+    if not admin_club:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Admin club not found"
+        )
+
+    return asset_service.delete_asset_for_admin(admin_club.club_id, asset_id)
 
 
 @router.post("/assets/{asset_id}/pictures", status_code=status.HTTP_201_CREATED)

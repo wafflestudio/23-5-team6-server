@@ -3,7 +3,7 @@ from datetime import datetime
 from io import StringIO, BytesIO
 from typing import Annotated, List
 
-from fastapi import Depends, UploadFile
+from fastapi import Depends, UploadFile, HTTPException, status
 from openpyxl import Workbook, load_workbook
 from openpyxl.utils import get_column_letter
 from asset_management.app.assets.repositories import AssetRepository
@@ -56,7 +56,15 @@ class AssetService:
         
         asset = self.asset_repository.get_asset_by_id(asset_id)
         if asset is None:
-            raise Exception("ItemNotFoundException")  # Replace with proper exception
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Asset not found",
+            )
+        if asset.club_id != admin_club_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Permission denied",
+            )
 
         updated_asset = self.asset_repository.modify_asset(
             asset,
@@ -84,11 +92,19 @@ class AssetService:
             max_rental_days=updated_asset.max_rental_days,
         )
 
-    def delete_asset_for_admin(self, asset_id: int) -> None:
+    def delete_asset_for_admin(self, admin_club_id: int, asset_id: int) -> None:
 
         asset = self.asset_repository.get_asset_by_id(asset_id)
         if asset is None:
-            raise Exception("ItemNotFoundException")  # Replace with proper exception
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Asset not found",
+            )
+        if asset.club_id != admin_club_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Permission denied",
+            )
         
         self.asset_repository.delete_asset(asset)
 
