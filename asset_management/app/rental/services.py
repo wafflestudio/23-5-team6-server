@@ -29,17 +29,23 @@ class RentalService:
 
     def _schedule_to_rental(self, schedule: Schedule) -> RentalResponse:
         """Schedule 모델을 RentalResponse로 변환"""
-        # status 매핑: IN_USE -> borrowed, RETURNED -> returned
-        status_map = {
-            Status.IN_USE.value: "borrowed",
-            Status.RETURNED.value: "returned",
-        }
+        # status 판정: IN_USE + 기한 초과 -> overdue
+        # end_date == start_date인 경우는 무기한 대여 (expected_return_date 미지정)
+        if schedule.status == Status.IN_USE.value:
+            has_due_date = schedule.end_date and schedule.end_date != schedule.start_date
+            is_overdue = has_due_date and schedule.end_date < datetime.now()
+            rental_status = "overdue" if is_overdue else "in_use"
+        elif schedule.status == Status.RETURNED.value:
+            rental_status = "returned"
+        else:
+            rental_status = "in_use"
+        
         
         return RentalResponse(
             id=schedule.id,
             item_id=schedule.asset_id,
             user_id=schedule.user_id,
-            status=status_map.get(schedule.status, "borrowed"),
+            status=rental_status,
             borrowed_at=schedule.start_date,
             expected_return_date=schedule.end_date.date() if schedule.end_date else None,
             returned_at=schedule.end_date if schedule.status == Status.RETURNED.value else None,

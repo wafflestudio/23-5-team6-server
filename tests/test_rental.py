@@ -1,6 +1,6 @@
 import pytest
 from fastapi.testclient import TestClient
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 
 def _return_image_file():
     return {"file": ("return.jpg", b"fake-image-bytes", "image/jpeg")}
@@ -249,7 +249,7 @@ def test_borrow_item_success(client, user_token, test_asset, user_in_club):
     data = response.json()
     assert data["item_id"] == test_asset["id"]
     assert data["user_id"] == user_in_club["id"]
-    assert data["status"] == "borrowed"
+    assert data["status"] == "in_use"
     assert "id" in data
     assert isinstance(data["id"], int)
     assert data["expected_return_date"] == tomorrow.isoformat()
@@ -271,7 +271,7 @@ def test_borrow_item_without_expected_return_date(client, user_token, test_asset
     assert response.status_code == 201
     data = response.json()
     assert data["item_id"] == test_asset["id"]
-    assert data["status"] == "borrowed"
+    assert data["status"] == "in_use"
 
 
 def test_borrow_nonexistent_item(client, user_token, user_in_club):
@@ -678,5 +678,158 @@ def test_borrow_item_within_max_rental_days_success(
     assert response.status_code == 201
     data = response.json()
     assert data["item_id"] == test_asset_with_max_rental_days["id"]
-    assert data["status"] == "borrowed"
+    assert data["status"] == "in_use"
     assert data["expected_return_date"] == today.isoformat()
+
+
+def test_rental_status_overdue_when_past_due_date(
+    client,
+    user_token,
+    test_asset,
+    user_in_club,
+    db_session,
+):
+    """Test that rental status is 'overdue' when end_date has passed"""
+    from asset_management.app.schedule.models import Schedule, Status
+    from asset_management.app.rental.services import RentalService
+    from asset_management.app.schedule.repositories import ScheduleRepository
+    from asset_management.app.assets.repositories import AssetRepository
+
+    # 먼저 물품 대여
+    tomorrow = date.today() + timedelta(days=1)
+    payload = {
+        "item_id": test_asset["id"],
+        "expected_return_date": tomorrow.isoformat(),
+    }
+
+    response = client.post(
+        "/api/rentals/borrow",
+        json=payload,
+        headers={"Authorization": f"Bearer {user_token}"},
+    )
+    assert response.status_code == 201
+    rental_id = response.json()["id"]
+
+    # DB에서 end_date를 과거로 직접 수정
+    Session = db_session
+    session = Session()
+    try:
+        schedule = session.query(Schedule).filter(Schedule.id == rental_id).first()
+        # 어제로 end_date 설정 (연체 상태)
+        schedule.end_date = datetime.now() - timedelta(days=1)
+        session.commit()
+        session.refresh(schedule)
+
+        # RentalService의 _schedule_to_rental 메서드 직접 테스트
+        schedule_repo = ScheduleRepository(session)
+        asset_repo = AssetRepository(session)
+        rental_service = RentalService(schedule_repo, asset_repo, session)
+        
+        rental_response = rental_service._schedule_to_rental(schedule)
+        assert rental_response.status == "overdue"
+    finally:
+        session.close()
+
+
+def test_rental_status_remains_borrowed_when_not_overdue(
+    client,
+    user_token,
+    test_asset,
+    user_in_club,
+    db_session,
+):
+    """Test that rental status is 'borrowed' when end_date has not passed"""
+    from asset_management.app.schedule.models import Schedule
+    from asset_management.app.rental.services import RentalService
+    from asset_management.app.schedule.repositories import ScheduleRepository
+    from asset_management.app.assets.repositories import AssetRepository
+
+    # 미래 날짜로 대여
+    future_date = date.today() + timedelta(days=7)
+    payload = {
+        "item_id": test_asset["id"],
+        "expected_return_date": future_date.isoformat(),
+    }
+
+    response = client.post(
+        "/api/rentals/borrow",
+        json=payload,
+        headers={"Authorization": f"Bearer {user_token}"},
+    )
+    assert response.status_code == 201
+    rental_id = response.json()["id"]
+    assert response.json()["status"] == "in_use"
+
+    # DB에서 schedule 조회 후 _schedule_to_rental 확인
+    Session = db_session
+    session = Session()
+    try:
+        schedule = session.query(Schedule).filter(Schedule.id == rental_id).first()
+        
+        schedule_repo = ScheduleRepository(session)
+        asset_repo = AssetRepository(session)
+        rental_service = RentalService(schedule_repo, asset_repo, session)
+        
+        rental_response = rental_service._schedule_to_rental(schedule)
+        assert rental_response.status == "in_use"
+    finally:
+        session.close()
+
+
+def test_returned_status_not_affected_by_overdue_logic(
+    client,
+    user_token,
+    test_asset,
+    user_in_club,
+    db_session,
+):
+    """Test that returned status is not changed to overdue"""
+    from asset_management.app.schedule.models import Schedule, Status
+    from asset_management.app.rental.services import RentalService
+    from asset_management.app.schedule.repositories import ScheduleRepository
+    from asset_management.app.assets.repositories import AssetRepository
+
+    # 대여 후 반납
+    tomorrow = date.today() + timedelta(days=1)
+    payload = {
+        "item_id": test_asset["id"],
+        "expected_return_date": tomorrow.isoformat(),
+    }
+
+    response = client.post(
+        "/api/rentals/borrow",
+        json=payload,
+        headers={"Authorization": f"Bearer {user_token}"},
+    )
+    assert response.status_code == 201
+    rental_id = response.json()["id"]
+
+    # 반납
+    response = client.post(
+        f"/api/rentals/{rental_id}/return",
+        data={},
+        files=_return_image_file(),
+        headers={"Authorization": f"Bearer {user_token}"},
+    )
+    assert response.status_code == 200
+    assert response.json()["status"] == "returned"
+
+    # DB에서 end_date를 과거로 변경해도 returned 상태 유지 확인
+    Session = db_session
+    session = Session()
+    try:
+        schedule = session.query(Schedule).filter(Schedule.id == rental_id).first()
+        # 과거로 end_date 설정
+        schedule.end_date = datetime.now() - timedelta(days=1)
+        session.commit()
+        session.refresh(schedule)
+
+        schedule_repo = ScheduleRepository(session)
+        asset_repo = AssetRepository(session)
+        rental_service = RentalService(schedule_repo, asset_repo, session)
+        
+        rental_response = rental_service._schedule_to_rental(schedule)
+        # returned 상태는 overdue로 변경되지 않음
+        assert rental_response.status == "returned"
+    finally:
+        session.close()
