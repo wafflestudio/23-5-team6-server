@@ -5,6 +5,8 @@ services:
     container_name: asset_management
     env_file:
       - /home/ubuntu/.env.prod
+    ports:
+      - "8000:8000"
     networks:
       - my-network
     command: sh -c "uv run alembic upgrade head && uv run uvicorn asset_management.main:app --host 0.0.0.0 --port 8000"
