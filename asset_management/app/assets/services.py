@@ -108,6 +108,7 @@ class AssetService:
                 location=asset.location,
                 created_at=asset.created_at,
                 max_rental_days=asset.max_rental_days,
+                main_picture=next((p.id for p in asset.pictures if p.is_main), None),
             )
             for asset in assets
         ]

@@ -24,6 +24,7 @@ class AssetResponse(BaseModel):
     location: Optional[str] = None
     created_at: datetime
     max_rental_days: Optional[int] = None
+    main_picture: Optional[int] = None
 
     class Config:
         from_attributes = True
