@@ -19,7 +19,7 @@ class StatisticsService:
     if statistics is None:
       self.statistics_repository.create(asset_id)
       statistics = self.update_statistics_for_asset(asset_id)
-    if statistics.last_updated_at > datetime.now() + timedelta(days=3):
+    if statistics.last_updated_at < datetime.now() - timedelta(days=3):
       statistics = self.update_statistics_for_asset(asset_id)
 
     return AssetStatistics.model_validate(statistics)
